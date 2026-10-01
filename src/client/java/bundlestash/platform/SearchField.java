@@ -29,16 +29,10 @@ public final class SearchField {
     private final Consumer<String> responder;
 
     private EditBox editBox;
-    private String value = "";
     private boolean visible;
 
     public SearchField(Consumer<String> responder) {
         this.responder = responder;
-    }
-
-    /** 字体尚未就绪时返回 {@code null}（客户端入口阶段就可能发生）。 */
-    public EditBox widget() {
-        return ensure();
     }
 
     private EditBox ensure() {
@@ -54,7 +48,6 @@ public final class SearchField {
         box.setTextColor(0xFFFFFFFF);
         box.setTextColorUneditable(0xFF888888);
         box.setResponder(responder);
-        box.setValue(value);
         box.setVisible(visible);
         this.editBox = box;
         return box;
@@ -95,17 +88,6 @@ public final class SearchField {
         box.extractWidgetRenderState(graphics, mouseX, mouseY, partialTick);
     }
 
-    // ------------------------------------------------------------ 值
-
-    public String value() {
-        return editBox == null ? value : editBox.getValue();
-    }
-
-    public void setValue(String newValue) {
-        this.value = newValue == null ? "" : newValue;
-        if (editBox != null && !editBox.getValue().equals(this.value)) editBox.setValue(this.value);
-    }
-
     // ------------------------------------------------------------ 输入
 
     public boolean isFocused() {
@@ -113,7 +95,7 @@ public final class SearchField {
     }
 
     /** 取得焦点（内部自己维护，不依赖界面的子控件分派）。 */
-    public void focus() {
+    private void focus() {
         EditBox box = ensure();
         if (box == null) return;
         box.setFocused(true);
@@ -123,10 +105,6 @@ public final class SearchField {
     public void unfocus() {
         EditBox box = editBox;
         if (box != null) box.setFocused(false);
-    }
-
-    public boolean isMouseOver(double mouseX, double mouseY) {
-        return editBox != null && editBox.isVisible() && editBox.isMouseOver(mouseX, mouseY);
     }
 
     public void onMouseClicked(MouseButtonEvent event, boolean doubleClick) {

@@ -9,10 +9,9 @@ package bundlestash.core;
  * @param columns        网格列数
  * @param rows           可见行数
  * @param cell           单格边长
- * @param gap            格间距（原版槽位是紧挨着的，所以默认 0）
+ * @param gap            格间距（原版槽位是紧挨着的，所以取 0/1）
  * @param padding        面板内边距
  * @param screenGap      面板与界面边缘的间距
- * @param categorySize   分类按钮边长上限（空间不足时自动缩小）
  * @param scrollbarWidth 滚动条宽度
  * @param searchHeight   搜索框高度，为 0 时不绘制搜索框
  * @param footerHeight   底部统计/进度条高度
@@ -24,13 +23,10 @@ public record PanelMetrics(
         int gap,
         int padding,
         int screenGap,
-        int categorySize,
         int scrollbarWidth,
         int searchHeight,
         int footerHeight
 ) {
-    public static final PanelMetrics DEFAULT = new PanelMetrics(9, 8, 18, 0, 6, 4, 22, 6, 16, 15);
-
     public int gridWidth() {
         return columns * cell + (columns - 1) * gap;
     }
@@ -40,7 +36,7 @@ public record PanelMetrics(
     }
 
     public PanelMetrics withRows(int newRows) {
-        return new PanelMetrics(columns, newRows, cell, gap, padding, screenGap, categorySize, scrollbarWidth,
+        return new PanelMetrics(columns, newRows, cell, gap, padding, screenGap, scrollbarWidth,
                 searchHeight, footerHeight);
     }
 

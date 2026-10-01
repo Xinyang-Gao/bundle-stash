@@ -1,7 +1,9 @@
 package bundlestash.mixin;
 
 import bundlestash.BetterBundleMod;
+import bundlestash.gui.BundlePanelController;
 import bundlestash.platform.SearchField;
+import com.mojang.blaze3d.platform.InputConstants;
 import net.minecraft.client.KeyboardHandler;
 import net.minecraft.client.input.CharacterEvent;
 import net.minecraft.client.input.KeyEvent;
@@ -24,6 +26,14 @@ public abstract class KeyboardHandlerMixin {
     @Inject(method = "keyPress", at = @At("HEAD"), cancellable = true)
     private void betterBundle$keyPress(long handle, int action, KeyEvent event, CallbackInfo ci) {
         if (action == 0) return; // 抬起事件不处理
+
+        // 设置弹窗打开时，Esc 先关弹窗，否则这一下会直接关掉容器界面
+        BundlePanelController controller = controller();
+        if (controller != null && event.key() == InputConstants.KEY_ESCAPE && controller.onEscape()) {
+            ci.cancel();
+            return;
+        }
+
         SearchField field = searchField();
         if (field != null && field.onKeyPressed(event)) ci.cancel();
     }
@@ -43,5 +53,10 @@ public abstract class KeyboardHandlerMixin {
     private static SearchField searchField() {
         BetterBundleMod mod = BetterBundleMod.instance();
         return mod == null ? null : mod.controller().searchField();
+    }
+
+    private static BundlePanelController controller() {
+        BetterBundleMod mod = BetterBundleMod.instance();
+        return mod == null ? null : mod.controller();
     }
 }

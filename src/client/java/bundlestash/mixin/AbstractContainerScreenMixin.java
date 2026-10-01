@@ -4,6 +4,7 @@ import bundlestash.BetterBundleMod;
 import bundlestash.core.Rect;
 import bundlestash.gui.BundleInput;
 import bundlestash.gui.BundlePanelController;
+import bundlestash.gui.PanelPalette;
 import bundlestash.mixin.accessor.AbstractContainerScreenAccess;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
@@ -39,8 +40,7 @@ public abstract class AbstractContainerScreenMixin {
         Rect screenRect = BundleInput.screenRect(access);
         BundlePanelController controller = BetterBundleMod.instance().controller();
         BetterBundleMod.runGuarded("render", () -> {
-            controller.render((AbstractContainerScreen<?>) (Object) this, screenRect, graphics,
-                    mouseX, mouseY, partialTick);
+            controller.render(screenRect, graphics, mouseX, mouseY, partialTick);
             betterBundle$highlightSource(controller, graphics, access);
         });
     }
@@ -58,7 +58,7 @@ public abstract class AbstractContainerScreenMixin {
 
         int left = access.bundlestash$leftPos() + slot.x;
         int top = access.bundlestash$topPos() + slot.y;
-        int color = 0xFFFFC864;
+        int color = PanelPalette.SOURCE_HIGHLIGHT;
         graphics.fill(left - 1, top - 1, left + 17, top, color);
         graphics.fill(left - 1, top + 16, left + 17, top + 17, color);
         graphics.fill(left - 1, top, left, top + 16, color);

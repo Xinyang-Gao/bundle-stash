@@ -30,7 +30,7 @@ dependencies {
     implementation "net.fabricmc:fabric-loader:${project.loader_version}"
     // 本模组不使用 Fabric API，因此不引入它，避免被某个版本的 API 卡住
 
-    embed 'com.belerweb:pinyin4j:2.5.1'
+    embed "com.belerweb:pinyin4j:${project.pinyin4j_version}"
 }
 
 processResources {
@@ -43,24 +43,22 @@ processResources {
 }
 
 tasks.withType(JavaCompile).configureEach {
-    it.options.release = 25
-    it.options.encoding = 'UTF-8'
-    it.options.compilerArgs << '-Xlint:deprecation'
+    options.release = 25
+    options.encoding = 'UTF-8'
+    options.compilerArgs.addAll('-Xlint:deprecation', '-Xlint:unchecked')
 }
 
 java {
     withSourcesJar()
-
-    sourceCompatibility = JavaVersion.VERSION_25
-    targetCompatibility = JavaVersion.VERSION_25
 }
 
 jar {
-    // 把 pinyin4j 的类直接打进 jar（不使用 jar-in-jar，避免额外的加载器依赖）
-    from {
-        configurations.embed.collect { it.isDirectory() ? it : zipTree(it) }
+    // 把 pinyin4j 的类直接打进 jar（不使用 jar-in-jar，避免额外的加载器依赖）。
+    // 排除只作用于嵌入的依赖：剥掉它自己的 META-INF（清单/签名文件），
+    // 模组自身的资源与生成的 MANIFEST.MF 不受影响
+    from({ configurations.embed.collect { it.isDirectory() ? it : zipTree(it) } }) {
+        exclude 'META-INF/**'
     }
-    exclude 'META-INF/**'
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 }
 
@@ -69,8 +67,5 @@ publishing {
         create("mavenJava", MavenPublication) {
             from components.java
         }
-    }
-
-    repositories {
     }
 }

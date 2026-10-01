@@ -57,16 +57,6 @@ public final class McGraphics implements PanelGraphics<ItemStack> {
     }
 
     @Override
-    public int textWidth(String text) {
-        return client.font.width(text);
-    }
-
-    @Override
-    public int lineHeight() {
-        return client.font.lineHeight;
-    }
-
-    @Override
     public void showTooltip(ItemStack stack, int mouseX, int mouseY) {
         Font font = client.font;
         graphics.setTooltipForNextFrame(font, stack, mouseX, mouseY);
@@ -80,11 +70,6 @@ public final class McGraphics implements PanelGraphics<ItemStack> {
     @Override
     public ItemStack iconOf(String itemId) {
         return McAccess.iconOf(itemId);
-    }
-
-    @Override
-    public String nameOf(ItemStack stack) {
-        return stack.getDisplayName().getString();
     }
 
     @Override

@@ -29,7 +29,7 @@ public final class BundleWeights {
     }
 
     /** 单个物品所占的重量单位数（向上取整，保证非 1/16/64 堆叠不会因为取整而被判为 0）。 */
-    public static int perItem(int maxStack) {
+    private static int perItem(int maxStack) {
         if (maxStack <= 0) return FULL;
         if (maxStack >= FULL) return 1;
         if (FULL % maxStack == 0) return FULL / maxStack;

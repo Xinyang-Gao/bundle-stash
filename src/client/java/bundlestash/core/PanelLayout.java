@@ -9,100 +9,151 @@ import java.util.List;
  * 旧版在渲染处与点击判定处各算一遍坐标（还夹杂 {@code +16}、{@code -10}、{@code +24}
  * 之类的魔数），结果就是"看着悬停在第 3 格、实际点到第 5 格"。这里改为一次算好所有矩形，
  * 渲染、点击、滚动、拖拽全部复用同一批矩形。
+ * <p>
+ * 结构上分三块，互相独立：
+ * <ul>
+ *   <li>{@link #categoryButtons()} —— 横向排在容器界面<b>上方</b>的分类按钮条</li>
+ *   <li>{@link #panel()} —— 贴在容器界面一侧的面板（搜索框 + 网格 + 底部统计）</li>
+ *   <li>{@link #toggleButton()} / {@link #settingsButton()} —— 界面角落的开关与设置按钮</li>
+ * </ul>
  */
 public final class PanelLayout {
 
-    private final Rect screen;
-    private final Side side;
+    /** 分类按钮里小图标的边长。 */
+    public static final int CATEGORY_ICON = 16;
+    /** 分类按钮高度。 */
+    public static final int CATEGORY_BUTTON_H = 18;
+    /** 分类按钮内部的水平留白。 */
+    public static final int CATEGORY_PAD = 3;
+    /** 分类按钮之间的间距。 */
+    public static final int CATEGORY_GAP = 2;
+    /** 分类条与容器界面上边缘的间距。 */
+    public static final int CATEGORY_BAR_GAP = 4;
+
     private final PanelMetrics metrics;
-    private final int categorySize;
 
     private final Rect panel;
-    private final Rect categoryBar;
     private final List<Rect> categoryButtons;
+    private final List<Rect> categoryIcons;
+    private final List<Integer> categoryLabelStarts;
     private final Rect searchBar;
     private final Rect scrollbar;
     private final Rect grid;
     private final Rect footer;
     private final Rect toggleButton;
+    private final Rect settingsButton;
 
     public enum Side { LEFT, RIGHT }
 
     /**
-     * @param screen        容器屏幕的绘制区域
-     * @param side          面板位于屏幕哪一侧
-     * @param metrics       尺寸参数
-     * @param categoryCount 分类数量
+     * 顶部分类条的布局参数。
+     * 分类名的文字宽度由上层（拿得到字体）算好传进来，这一层保持纯几何、不依赖字体 API。
+     * 只需要当前选中项的宽度——其余按钮只画小图标，不画文字。
+     *
+     * @param count              分类数量
+     * @param selectedIndex      当前选中的下标（该按钮会展开显示分类名），-1 表示无
+     * @param selectedLabelWidth 选中分类名的文字宽度（px）
      */
-    public PanelLayout(Rect screen, Side side, PanelMetrics metrics, int categoryCount) {
-        this.screen = screen;
-        this.side = side;
+    public record CategoryTabs(int count, int selectedIndex, int selectedLabelWidth) {
+    }
+
+    /**
+     * @param screen      容器屏幕的绘制区域
+     * @param side        面板位于屏幕哪一侧
+     * @param metrics     尺寸参数
+     * @param windowWidth 窗口宽度，用于保证分类条不会被挤出屏幕
+     * @param tabs        顶部分类条参数
+     */
+    public PanelLayout(Rect screen, Side side, PanelMetrics metrics, int windowWidth, CategoryTabs tabs) {
         this.metrics = metrics;
 
         int gridW = metrics.gridWidth();
         int gridH = metrics.gridHeight();
         int searchBlock = metrics.searchHeight() > 0 ? metrics.searchHeight() + metrics.gap() : 0;
 
-        this.categorySize = categorySizeFor(categoryCount, searchBlock + gridH, metrics);
+        // ---------------------------------------------------------- 顶部横向分类条
+        int count = Math.max(0, tabs.count());
+        int[] widths = new int[count];
+        int totalWidth = 0;
+        for (int i = 0; i < count; i++) {
+            // 选中的按钮多出一段分类名，其余按钮只显示小图标
+            int label = i == tabs.selectedIndex() ? Math.max(0, tabs.selectedLabelWidth()) : 0;
+            widths[i] = CATEGORY_PAD + CATEGORY_ICON + CATEGORY_PAD + (label > 0 ? CATEGORY_PAD + label : 0);
+            totalWidth += widths[i];
+        }
+        totalWidth += Math.max(0, count - 1) * CATEGORY_GAP;
 
+        // 相对界面横向居中，并保证整条完整落在窗口内
+        int maxX = Math.max(2, windowWidth - totalWidth - 2);
+        int barX = Math.max(2, Math.min(screen.x() + (screen.width() - totalWidth) / 2, maxX));
+        // 界面上方空间不足时贴到窗口顶部（此时可能与界面重叠，属于极端窄窗口的兜底）
+        int barY = Math.max(2, screen.y() - CATEGORY_BAR_GAP - CATEGORY_BUTTON_H);
+
+        List<Rect> buttons = new ArrayList<>(count);
+        List<Rect> icons = new ArrayList<>(count);
+        List<Integer> labelStarts = new ArrayList<>(count);
+        int cursor = barX;
+        for (int i = 0; i < count; i++) {
+            buttons.add(new Rect(cursor, barY, widths[i], CATEGORY_BUTTON_H));
+            icons.add(new Rect(cursor + CATEGORY_PAD,
+                    barY + (CATEGORY_BUTTON_H - CATEGORY_ICON) / 2, CATEGORY_ICON, CATEGORY_ICON));
+            labelStarts.add(cursor + CATEGORY_PAD + CATEGORY_ICON + CATEGORY_PAD);
+            cursor += widths[i] + CATEGORY_GAP;
+        }
+        this.categoryButtons = List.copyOf(buttons);
+        this.categoryIcons = List.copyOf(icons);
+        this.categoryLabelStarts = List.copyOf(labelStarts);
+
+        // ---------------------------------------------------------- 侧栏面板
         int contentTop = metrics.padding() + searchBlock;
-        int panelWidth = metrics.padding() + categorySize + metrics.gap()
-                + metrics.scrollbarWidth() + metrics.gap() + gridW + metrics.padding();
-        // 分类竖条与网格取较高者，保证分类按钮永远不会被裁掉
-        int contentHeight = Math.max(gridH, categorySize * categoryCount);
-        int panelHeight = contentTop + contentHeight + metrics.gap() + metrics.footerHeight() + metrics.padding();
+        int panelWidth = metrics.padding() * 2 + metrics.scrollbarWidth() + metrics.gap() + gridW;
+        int panelHeight = contentTop + gridH + metrics.gap() + metrics.footerHeight() + metrics.padding();
 
         int panelX = side == Side.LEFT ? screen.x() - metrics.screenGap() - panelWidth
                 : screen.right() + metrics.screenGap();
         this.panel = new Rect(panelX, screen.y(), panelWidth, panelHeight);
 
-        int barX = panelX + metrics.padding();
-        int barY = panel.y() + metrics.padding();
-        this.categoryBar = new Rect(barX, barY, categorySize, categorySize * categoryCount);
-        this.categoryButtons = new ArrayList<>(categoryCount);
-        for (int i = 0; i < categoryCount; i++) {
-            this.categoryButtons.add(new Rect(barX, barY + i * categorySize, categorySize, categorySize));
-        }
-
-        int contentX = barX + categorySize + metrics.gap();
-        int contentWidth = panelWidth - metrics.padding() - categorySize - metrics.gap() - metrics.padding();
+        int contentX = panelX + metrics.padding();
+        int contentWidth = panelWidth - metrics.padding() * 2;
         this.searchBar = new Rect(contentX, panel.y() + metrics.padding(), contentWidth, metrics.searchHeight());
 
         int contentY = panel.y() + contentTop;
         this.scrollbar = new Rect(contentX, contentY, metrics.scrollbarWidth(), gridH);
         this.grid = new Rect(contentX + metrics.scrollbarWidth() + metrics.gap(), contentY, gridW, gridH);
-        this.footer = new Rect(grid.x(), panel.y() + contentTop + contentHeight + metrics.gap(),
+        this.footer = new Rect(grid.x(), panel.y() + contentTop + gridH + metrics.gap(),
                 gridW, metrics.footerHeight());
-        this.toggleButton = new Rect(screen.right() + metrics.screenGap(), screen.y() + 2, 20, 20);
-    }
 
-    /**
-     * 空间不足时自动缩小分类按钮，保证所有分类始终可见。
-     * 下限 18：条目图标本身是 16px，再小就会互相压住。
-     */
-    private static int categorySizeFor(int count, int availableHeight, PanelMetrics metrics) {
-        if (count <= 0) return metrics.categorySize();
-        int usable = Math.max(18, availableHeight - metrics.padding() * 2);
-        return Math.max(18, Math.min(metrics.categorySize(), usable / count));
+        // ---------------------------------------------------------- 角落按钮
+        // 放在面板的**另一侧**，避免面板挪到右边时按钮被压在面板下面
+        int buttonX = side == Side.LEFT
+                ? screen.right() + metrics.screenGap()
+                : Math.max(2, screen.x() - metrics.screenGap() - 20);
+        this.toggleButton = new Rect(buttonX, screen.y() + 2, 20, 20);
+        this.settingsButton = new Rect(buttonX, screen.y() + 24, 20, 20);
     }
 
     public Rect panel() { return panel; }
-    public Rect categoryBar() { return categoryBar; }
     public Rect searchBar() { return searchBar; }
     public Rect scrollbar() { return scrollbar; }
     public Rect grid() { return grid; }
     public Rect footer() { return footer; }
     public Rect toggleButton() { return toggleButton; }
-    public int categorySize() { return categorySize; }
+    public Rect settingsButton() { return settingsButton; }
     public PanelMetrics metrics() { return metrics; }
-    public Side side() { return side; }
 
-    public Rect categoryButton(int index) {
-        return index < 0 || index >= categoryButtons.size() ? null : categoryButtons.get(index);
+    /** 顶部分类按钮的矩形列表（构造时已定型，可直接读）。 */
+    public List<Rect> categoryButtons() {
+        return categoryButtons;
     }
 
-    public List<Rect> categoryButtons() {
-        return List.copyOf(categoryButtons);
+    /** 分类按钮里小图标的矩形（16×16）。 */
+    public Rect categoryIconRect(int index) {
+        return index < 0 || index >= categoryIcons.size() ? null : categoryIcons.get(index);
+    }
+
+    /** 分类名文字的起始 x（紧跟在小图标右侧）。 */
+    public int categoryLabelStart(int index) {
+        return index < 0 || index >= categoryLabelStarts.size() ? 0 : categoryLabelStarts.get(index);
     }
 
     /** 某个格子（行、列）的矩形。 */
@@ -139,10 +190,6 @@ public final class PanelLayout {
             if (categoryButtons.get(i).contains(mouseX, mouseY)) return i;
         }
         return -1;
-    }
-
-    public boolean isInsideGrid(double mouseX, double mouseY) {
-        return grid.contains(mouseX, mouseY);
     }
 
     public boolean isInsidePanel(double mouseX, double mouseY) {

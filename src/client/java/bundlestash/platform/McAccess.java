@@ -6,7 +6,6 @@ import bundlestash.core.BundleModel;
 import bundlestash.core.BundleWeights;
 import bundlestash.core.ItemTraits;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.client.multiplayer.ClientPacketListener;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.core.component.DataComponents;
@@ -23,17 +22,20 @@ import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.BundleItem;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.ItemStackTemplate;
 import net.minecraft.world.item.component.BundleContents;
 import org.apache.commons.lang3.math.Fraction;
 
 import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.LinkedHashMap;
+import java.util.HashMap;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * 与 Minecraft 直接打交道的一层：采集收纳袋快照、把物品转成核心层能理解的数据，
@@ -41,33 +43,25 @@ import java.util.Set;
  * <p>
  * 所有与 Minecraft 版本相关的代码都收敛在这里和 {@code mixin} 包里，
  * 换版本时只需要替换这一层，{@code core} 与 {@code gui} 的逻辑可以复用。
+ * <p>
+ * 快照最多每 100ms 重建一次，且先由 {@link #snapshotFingerprint()} 判断值不值得重建，
+ * 因此这里的每一步都按"会被反复执行"来写：槽位索引一次建好、物品 id 与分类特征按物品缓存、
+ * 显示名干脆不进快照（见 {@link BundleEntry}），快照本体只做指针搬运。
  */
 public final class McAccess {
 
     private McAccess() {
     }
 
-    /** 用于分类判定的物品标签及其字符串形式（与 {@code ItemCategory} 中的规则对应）。 */
-    private static final Map<TagKey<Item>, String> CLASSIFIER_TAGS = new LinkedHashMap<>();
-    static {
-        CLASSIFIER_TAGS.put(ItemTags.SWORDS, "minecraft:swords");
-        CLASSIFIER_TAGS.put(ItemTags.AXES, "minecraft:axes");
-        CLASSIFIER_TAGS.put(ItemTags.PICKAXES, "minecraft:pickaxes");
-        CLASSIFIER_TAGS.put(ItemTags.SHOVELS, "minecraft:shovels");
-        CLASSIFIER_TAGS.put(ItemTags.HOES, "minecraft:hoes");
-        CLASSIFIER_TAGS.put(ItemTags.SPEARS, "minecraft:spears");
-        CLASSIFIER_TAGS.put(ItemTags.HEAD_ARMOR, "minecraft:head_armor");
-        CLASSIFIER_TAGS.put(ItemTags.CHEST_ARMOR, "minecraft:chest_armor");
-        CLASSIFIER_TAGS.put(ItemTags.LEG_ARMOR, "minecraft:leg_armor");
-        CLASSIFIER_TAGS.put(ItemTags.FOOT_ARMOR, "minecraft:foot_armor");
-        CLASSIFIER_TAGS.put(ItemTags.BOATS, "minecraft:boats");
-        CLASSIFIER_TAGS.put(ItemTags.CHEST_BOATS, "minecraft:chest_boats");
-        CLASSIFIER_TAGS.put(ItemTags.MEAT, "minecraft:meat");
-        CLASSIFIER_TAGS.put(ItemTags.FISHES, "minecraft:fishes");
-        CLASSIFIER_TAGS.put(ItemTags.SAPLINGS, "minecraft:saplings");
-        CLASSIFIER_TAGS.put(ItemTags.LEAVES, "minecraft:leaves");
-        CLASSIFIER_TAGS.put(ItemTags.VILLAGER_PLANTABLE_SEEDS, "minecraft:villager_plantable_seeds");
-    }
+    /** 物品 id 按物品缓存：registry id 是物品固有属性，无需每个条目查一次注册表再 toString。 */
+    private static final Map<Item, String> ID_CACHE = new IdentityHashMap<>();
+
+    /**
+     * 分类特征按物品缓存：方块/可食用/标签对同一物品的每个堆叠都一样，
+     * 按物品算一次即可。（个别堆叠被改写组件的极少数情况以先见到的堆叠为准，
+     * 影响仅限于分类归类，不影响任何交互。）
+     */
+    private static final Map<Item, ItemTraits> TRAIT_CACHE = new IdentityHashMap<>();
 
     // ------------------------------------------------------------------ 环境
 
@@ -87,9 +81,9 @@ public final class McAccess {
         return player().map(p -> p.containerMenu);
     }
 
-    /** 窗口高度，用于限制面板行数。 */
+    /** 窗口（GUI 缩放后）高度，用于限制面板行数。 */
     public static int windowHeight() {
-        return client().getWindow().getHeight();
+        return client().getWindow().getGuiScaledHeight();
     }
 
     // ------------------------------------------------------------ 收纳袋识别
@@ -107,6 +101,42 @@ public final class McAccess {
     // ---------------------------------------------------------------- 快照
 
     /**
+     * 背包状态的轻量指纹：菜单槽位映射 + 收纳袋内容的摘要。
+     * <p>
+     * 只做整数运算、不分配对象：空闲（背包没动）时每 100ms 只需遍历一次，
+     * 就能跳过整份快照的重建——而重建要物化袋内每个堆叠。见
+     * {@code BundlePanelController} 里对它的使用。
+     */
+    public static int snapshotFingerprint() {
+        LocalPlayer player = Minecraft.getInstance().player;
+        if (player == null) return 0;
+
+        AbstractContainerMenu menu = player.containerMenu;
+        int hash = menu.containerId;
+
+        // 槽位映射进指纹：切页/换界面时 slot id 会重排，交互包必须用新的
+        hash = hash * 31 + menu.slots.size();
+        for (Slot slot : menu.slots) {
+            hash = hash * 31 + slot.index;
+            hash = hash * 31 + slot.getContainerSlot();
+            hash = hash * 31 + System.identityHashCode(slot.container);
+        }
+
+        Inventory inventory = player.getInventory();
+        for (int inventoryIndex = 0; inventoryIndex < 36; inventoryIndex++) {
+            ItemStack stack = inventory.getItem(inventoryIndex);
+            if (!isBundle(stack)) continue;
+            hash = hash * 31 + inventoryIndex;
+            // 袋子本体的引用也要进指纹：toggleSelectedItem 会就地改这个对象
+            hash = hash * 31 + System.identityHashCode(stack);
+            for (ItemStackTemplate template : contentsOf(stack).items()) {
+                hash = hash * 31 + template.hashCode();
+            }
+        }
+        return hash;
+    }
+
+    /**
      * 采集玩家背包里的收纳袋。
      * <p>
      * 这里刻意直接读 {@link Inventory}，而不是遍历 {@code menu.slots}：创造模式物品栏、
@@ -122,6 +152,7 @@ public final class McAccess {
 
         Inventory inventory = player.getInventory();
         AbstractContainerMenu menu = player.containerMenu;
+        SlotLookup slots = SlotLookup.of(menu, inventory);
 
         List<BundleGroup<ItemStack>> groups = new ArrayList<>();
         for (int inventoryIndex = 0; inventoryIndex < 36; inventoryIndex++) {
@@ -131,41 +162,55 @@ public final class McAccess {
             BundleContents contents = contentsOf(stack);
             if (contents.isEmpty() && !includeEmpty) continue;
 
-            int slotId = findContainerSlot(menu, inventory, inventoryIndex, stack);
-            BundleGroup<ItemStack> group = buildGroup(stack, contents, slotId, groups.size());
-            groups.add(group);
+            groups.add(buildGroup(stack, contents, slots.find(inventoryIndex, stack), groups.size()));
         }
         return new BundleModel<>(List.copyOf(groups), includeEmpty);
     }
 
-    private static BundleGroup<ItemStack> buildGroup(ItemStack stack, BundleContents contents, int slotId, int groupIndex) {
-        List<ItemStack> copies = contents.itemCopies().toList();
-        List<BundleEntry<ItemStack>> items = new ArrayList<>(copies.size());
-        for (int i = 0; i < copies.size(); i++) {
-            ItemStack copy = copies.get(i);
+    private static BundleGroup<ItemStack> buildGroup(ItemStack bundleStack, BundleContents contents,
+                                                     int slotId, int groupIndex) {
+        // 26.3 起袋内物品以 ItemStackTemplate 存储，绘制要的还是实体堆叠，这里照旧物化一份
+        List<ItemStack> stacks = contents.itemCopies().toList();
+        List<BundleEntry<ItemStack>> items = new ArrayList<>(stacks.size());
+        for (int i = 0; i < stacks.size(); i++) {
+            ItemStack stack = stacks.get(i);
             items.add(new BundleEntry<>(
-                    copy,
-                    idOf(copy),
-                    nameOf(copy),
+                    stack,
+                    idOf(stack),
                     groupIndex,
                     i,
-                    copy.getCount(),
-                    BundleWeights.unitsOf(copy.getCount(), copy.getMaxStackSize()),
-                    traitsOf(copy)
+                    stack.getCount(),
+                    BundleWeights.unitsOf(stack.getCount(), stack.getMaxStackSize()),
+                    traitsOf(stack)
             ));
         }
-        return new BundleGroup<>(slotId, stack, List.copyOf(items), unitsOf(contents));
+        return new BundleGroup<>(slotId, bundleStack, List.copyOf(items), unitsOf(contents));
     }
 
-    /** 在菜单里找到背包第 {@code inventoryIndex} 格对应的容器槽位号，找不到返回 -1。 */
-    private static int findContainerSlot(AbstractContainerMenu menu, Inventory inventory, int inventoryIndex, ItemStack stack) {
-        for (Slot slot : menu.slots) {
-            if (slot.getItem() == stack) return slot.index;
+    /** 菜单槽位的一次性索引，把"36 个背包格 × 全部槽位"的双向线性查找降到 O(1)。 */
+    private static final class SlotLookup {
+
+        private final Map<ItemStack, Integer> byStack = new IdentityHashMap<>();
+        private final Map<Integer, Integer> byInventorySlot = new HashMap<>();
+
+        static SlotLookup of(AbstractContainerMenu menu, Inventory inventory) {
+            SlotLookup index = new SlotLookup();
+            for (Slot slot : menu.slots) {
+                index.byStack.putIfAbsent(slot.getItem(), slot.index);
+                if (slot.container == inventory) {
+                    index.byInventorySlot.putIfAbsent(slot.getContainerSlot(), slot.index);
+                }
+            }
+            return index;
         }
-        for (Slot slot : menu.slots) {
-            if (slot.container == inventory && slot.getContainerSlot() == inventoryIndex) return slot.index;
+
+        /** 背包第 {@code inventoryIndex} 格对应的容器槽位号，找不到返回 -1。 */
+        int find(int inventoryIndex, ItemStack stack) {
+            Integer slot = byStack.get(stack);
+            if (slot != null) return slot;
+            Integer inventorySlot = byInventorySlot.get(inventoryIndex);
+            return inventorySlot == null ? -1 : inventorySlot;
         }
-        return -1;
     }
 
     /** 把 vanilla 的 Fraction 重量换算成 1/64 单位。 */
@@ -180,8 +225,10 @@ public final class McAccess {
     // -------------------------------------------------------------- 物品信息
 
     public static String idOf(ItemStack stack) {
-        Identifier id = BuiltInRegistries.ITEM.getKey(stack.getItem());
-        return id == null ? "minecraft:air" : id.toString();
+        return ID_CACHE.computeIfAbsent(stack.getItem(), item -> {
+            Identifier id = BuiltInRegistries.ITEM.getKey(item);
+            return id == null ? "minecraft:air" : id.toString();
+        });
     }
 
     public static String nameOf(ItemStack stack) {
@@ -190,15 +237,23 @@ public final class McAccess {
 
     public static ItemTraits traitsOf(ItemStack stack) {
         Item item = stack.getItem();
+        ItemTraits cached = TRAIT_CACHE.get(item);
+        if (cached != null) return cached;
+
         boolean block = item instanceof BlockItem;
         boolean fullBlock = block && ((BlockItem) item).getBlock().defaultBlockState().canOcclude();
         boolean edible = stack.get(DataComponents.FOOD) != null;
 
-        Set<String> tags = new HashSet<>();
-        for (Map.Entry<TagKey<Item>, String> entry : CLASSIFIER_TAGS.entrySet()) {
-            if (stack.is(entry.getKey())) tags.add(entry.getValue());
+        // 取物品的全部标签而不是维护一份"关心的标签"清单：
+        // 分类规则（ItemCategory）按标签 id 匹配，物品侧只需如实上报
+        Set<String> tags;
+        try (Stream<TagKey<Item>> stream = BuiltInRegistries.ITEM.wrapAsHolder(item).tags()) {
+            tags = stream.map(tag -> tag.location().toString()).collect(Collectors.toUnmodifiableSet());
         }
-        return new ItemTraits(block, fullBlock, edible, stack.getMaxStackSize() > 1, tags);
+
+        ItemTraits traits = new ItemTraits(block, fullBlock, edible, tags);
+        TRAIT_CACHE.put(item, traits);
+        return traits;
     }
 
     /** 把物品 id 解析成用于显示图标的 {@link ItemStack}。 */
@@ -239,14 +294,11 @@ public final class McAccess {
      */
     public static void sendClick(int slotId, int button, ContainerInput action) {
         if (slotId < 0) return;
-        LocalPlayer player = Minecraft.getInstance().player;
-        if (player == null) return;
-        Minecraft.getInstance().gameMode.handleContainerInput(player.containerMenu.containerId, slotId, button, action, player);
-    }
-
-    /** 从 {@link MouseButtonEvent} 换算 vanilla 的点击按钮编号。 */
-    public static int clickButton(MouseButtonEvent event) {
-        return event.button() == 3 ? 1 : 0;
+        Minecraft client = Minecraft.getInstance();
+        // 世界卸载/切换的瞬间 gameMode 会为 null，此时不发包（否则 NPE 会把整个侧栏停用）
+        if (client.player == null || client.gameMode == null) return;
+        client.gameMode.handleContainerInput(client.player.containerMenu.containerId, slotId, button, action,
+                client.player);
     }
 
     // ------------------------------------------------------------ 目标槽位

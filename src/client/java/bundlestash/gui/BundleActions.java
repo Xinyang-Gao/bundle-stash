@@ -27,6 +27,10 @@ import java.util.OptionalInt;
  */
 public final class BundleActions {
 
+    /** vanilla 的鼠标按钮编号：0 = 主键（左键），1 = 副键（右键）。 */
+    public static final int PRIMARY = 0;
+    public static final int SECONDARY = 1;
+
     private BundleActions() {
     }
 
@@ -106,8 +110,4 @@ public final class BundleActions {
         if (entry.groupIndex() < 0 || entry.groupIndex() >= model.groups().size()) return null;
         return model.groups().get(entry.groupIndex());
     }
-
-    /** vanilla 的鼠标按钮编号：0 = 主键（左键），1 = 副键（右键）。 */
-    public static final int PRIMARY = 0;
-    public static final int SECONDARY = 1;
 }

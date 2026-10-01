@@ -17,10 +17,7 @@ public record Rect(int x, int y, int width, int height) {
         return px >= x && px < right() && py >= y && py < bottom();
     }
 
-    public Rect translated(int dx, int dy) {
-        return new Rect(x + dx, y + dy, width, height);
-    }
-
+    /** 向四周扩边（负值为缩边），用于抵消贴图自带的透明边。 */
     public Rect expanded(int by) {
         return new Rect(x - by, y - by, width + by * 2, height + by * 2);
     }

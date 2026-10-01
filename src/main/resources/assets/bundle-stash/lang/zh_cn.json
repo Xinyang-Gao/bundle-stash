@@ -9,6 +9,10 @@
   "bundlestash.category.minerals": "矿物",
   "bundlestash.category.misc": "杂物",
   "bundlestash.no_bundle": "背包里没有收纳袋",
+  "bundlestash.settings": "设置",
+  "bundlestash.settings.title": "设置",
+  "bundlestash.settings.rows": "行数",
+  "bundlestash.settings.columns": "列数",
   "modmenu.nameTranslation.bundle-stash": "探囊取物",
   "modmenu.descriptionTranslation.bundle-stash": "在容器界面侧边显示所有收纳袋的内容，支持分类、搜索与一键存取。"
 }

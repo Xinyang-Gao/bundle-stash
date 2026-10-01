@@ -4,19 +4,16 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * 玩家背包中所有收纳袋的只读快照。每次重绘前由平台层重建一次。
+ * 玩家背包中所有收纳袋的只读快照。每次重绘前由平台层重建一次，
+ * 是否真的需要重建由平台层的指纹（{@code McAccess#snapshotFingerprint}）决定。
  *
- * @param groups        非空的收纳袋列表
- * @param includeEmpty  是否包含空收纳袋
+ * @param groups       收纳袋列表
+ * @param includeEmpty 是否包含空收纳袋
  */
 public record BundleModel<S>(List<BundleGroup<S>> groups, boolean includeEmpty) {
 
     public static <S> BundleModel<S> empty() {
         return new BundleModel<>(List.of(), false);
-    }
-
-    public boolean isEmpty() {
-        return groups.isEmpty();
     }
 
     /** 收纳袋数量。 */
@@ -59,10 +56,5 @@ public record BundleModel<S>(List<BundleGroup<S>> groups, boolean includeEmpty) 
         List<BundleEntry<S>> result = new ArrayList<>(stackCount());
         for (BundleGroup<S> group : groups) result.addAll(group.items());
         return result;
-    }
-
-    /** 取得某格所属的收纳袋。 */
-    public BundleGroup<S> groupOf(BundleEntry<S> entry) {
-        return groups.get(entry.groupIndex());
     }
 }

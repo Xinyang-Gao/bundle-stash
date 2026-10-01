@@ -12,15 +12,6 @@ import java.util.List;
  */
 public record BundleGroup<S>(int containerSlot, S bundleStack, List<BundleEntry<S>> items, int weightUnits) {
 
-    public boolean isEmpty() {
-        return items.isEmpty();
-    }
-
-    /** 剩余容量（重量单位）。 */
-    public int remaining() {
-        return Math.max(0, BundleWeights.FULL - weightUnits);
-    }
-
     /** 满度百分比，用于绘制进度条。 */
     public int fullnessPercent() {
         return (int) Math.round(BundleWeights.fullness(weightUnits) * 100.0);

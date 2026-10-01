@@ -1,14 +1,19 @@
 package bundlestash.core;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /**
  * 侧栏分类。
  * <p>
  * 与旧版最大的不同：不再硬编码上千个物品 id，而是依据 {@link ItemTraits}（标签 + 物品属性）
- * 做正则/关键字匹配。这样新版本加入的物品、以及部分模组物品都能自动落到合适分类里，
+ * 做关键字匹配。这样新版本加入的物品、以及部分模组物品都能自动落到合适分类里，
  * 也不会因为版本更新出现"分类表过期"的问题。
+ * <p>
+ * 分类结果按 {@code (物品 id, 特征)} 记忆：结果只取决于入参，而这条判定在每次
+ * 视图过滤时都会对每个条目跑一遍（关键字匹配是几十次字符串扫描）。
  */
 public enum ItemCategory {
     ALL("all", "minecraft:compass"),
@@ -58,13 +63,17 @@ public enum ItemCategory {
     private final String id;
     private final String iconId;
 
+    /** 分类判定的缓存键：分类只由物品 id 与它的特征决定。 */
+    private record ClassifyKey(String id, ItemTraits traits) {
+    }
+
+    private static final int CACHE_LIMIT = 4096;
+    /** 只在渲染线程使用（视图过滤发生在渲染阶段），无需并发容器。 */
+    private static final Map<ClassifyKey, ItemCategory> CLASSIFY_CACHE = new HashMap<>();
+
     ItemCategory(String id, String iconId) {
         this.id = id;
         this.iconId = iconId;
-    }
-
-    public String id() {
-        return id;
     }
 
     /** 分类按钮/标题使用的图标物品 id，由平台层解析为物品。 */
@@ -77,20 +86,24 @@ public enum ItemCategory {
         return "bundlestash.category." + id;
     }
 
-    public static ItemCategory of(String id) {
-        for (ItemCategory category : values()) {
-            if (category.id.equals(id)) return category;
-        }
-        return ALL;
-    }
-
     /**
-     * 判定单个物品属于哪个分类。
+     * 判定单个物品属于哪个分类（结果带缓存）。
      *
      * @param itemId 物品的 registry id
      * @param traits 由平台层采集的特征
      */
     public static ItemCategory classify(String itemId, ItemTraits traits) {
+        ClassifyKey key = new ClassifyKey(itemId, traits);
+        ItemCategory cached = CLASSIFY_CACHE.get(key);
+        if (cached != null) return cached;
+
+        ItemCategory result = classifyNow(itemId, traits);
+        if (CLASSIFY_CACHE.size() >= CACHE_LIMIT) CLASSIFY_CACHE.clear();
+        CLASSIFY_CACHE.put(key, result);
+        return result;
+    }
+
+    private static ItemCategory classifyNow(String itemId, ItemTraits traits) {
         String path = path(itemId);
         for (String tag : TOOL_TAGS) {
             if (traits.hasTag(tag)) return TOOLS;

@@ -38,8 +38,9 @@ public final class BetterBundleMod implements ClientModInitializer {
         configPath = FabricLoader.getInstance().getConfigDir().resolve("bundle-stash.json");
         config = BundleConfig.load(configPath);
 
-        Romanizer romanizer = config.pinyinSearch ? PinyinRomanizer.getOrNull() : Romanizer.NONE;
-        controller = new BundlePanelController(romanizer == null ? Romanizer.NONE : romanizer, config);
+        // 拼音库缺失/未启用时降级为普通搜索
+        Romanizer romanizer = config.pinyinSearch ? PinyinRomanizer.getOrNull() : null;
+        controller = new BundlePanelController(romanizer != null ? romanizer : Romanizer.NONE, config);
     }
 
     public static BetterBundleMod instance() {

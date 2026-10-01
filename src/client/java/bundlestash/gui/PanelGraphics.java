@@ -27,10 +27,6 @@ public interface PanelGraphics<S> {
 
     void centeredText(String text, int centerX, int y, int argb);
 
-    int textWidth(String text);
-
-    int lineHeight();
-
     void showTooltip(S stack, int mouseX, int mouseY);
 
     /** 用原版样式显示一段文本提示（用于分类名等）。 */
@@ -39,9 +35,15 @@ public interface PanelGraphics<S> {
     /** 把 id（如 {@code minecraft:diamond}）解析成可用于绘制的物品。 */
     S iconOf(String itemId);
 
-    /** 取物品的本地化名称。 */
-    String nameOf(S stack);
-
     /** 取多语言文本。 */
     String translate(String key);
+
+    /** 原版容器式底板：浅灰底 + 1px 深色描边，面板与设置弹窗共用。 */
+    default void containerBackground(Rect rect) {
+        fill(rect, PanelPalette.PANEL_BG);
+        fill(new Rect(rect.x(), rect.y(), rect.width(), 1), PanelPalette.BORDER);
+        fill(new Rect(rect.x(), rect.bottom() - 1, rect.width(), 1), PanelPalette.BORDER);
+        fill(new Rect(rect.x(), rect.y(), 1, rect.height()), PanelPalette.BORDER);
+        fill(new Rect(rect.right() - 1, rect.y(), 1, rect.height()), PanelPalette.BORDER);
+    }
 }

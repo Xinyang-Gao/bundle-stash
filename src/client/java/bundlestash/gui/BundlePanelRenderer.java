@@ -40,17 +40,6 @@ public final class BundlePanelRenderer<S> {
     private static final String SPRITE_BAR_FULL = "minecraft:container/bundle/bundle_progressbar_full";
     private static final String SPRITE_BAR_BORDER = "minecraft:container/bundle/bundle_progressbar_border";
 
-    /** 原版容器面板底色。 */
-    private static final int COLOR_PANEL_BG = 0xFFC6C6C6;
-    private static final int COLOR_PANEL_BORDER = 0xFF000000;
-    /** 浅色面板上用深色文字（和原版容器标题一致）。 */
-    private static final int COLOR_TEXT = 0xFF404040;
-    private static final int COLOR_TEXT_DIM = 0xFFA0A0A0;
-    private static final int COLOR_ACCENT = 0xFF3B6EA5;
-
-    /** 原版槽位贴图的原始边长，缩放时以它为中心对齐。 */
-    private static final int SLOT_NATIVE = 18;
-
     /**
      * {@code slot_highlight_*} 是 24×24 的九宫格贴图，自带 4px 透明边（mcmeta border=4）。
      * 按目标矩形直接绘制时透明边会占掉一圈，只剩中心一小块可见，看起来就是"高亮没盖住整格"；
@@ -58,9 +47,9 @@ public final class BundlePanelRenderer<S> {
      */
     private static final int HIGHLIGHT_PADDING = 4;
 
-    private final ItemCategory[] categories;
+    private final List<ItemCategory> categories;
 
-    public BundlePanelRenderer(ItemCategory[] categories) {
+    public BundlePanelRenderer(List<ItemCategory> categories) {
         this.categories = categories;
     }
 
@@ -90,7 +79,7 @@ public final class BundlePanelRenderer<S> {
         double mouseX = request.mouseX();
         double mouseY = request.mouseY();
 
-        drawPanelBackground(graphics, layout.panel());
+        graphics.containerBackground(layout.panel());
 
         drawSearchField(request);
         drawCategoryButtons(request);
@@ -101,22 +90,18 @@ public final class BundlePanelRenderer<S> {
         int firstVisible = scrollRow * columns;
         int visibleCount = Math.max(0, Math.min(columns * layout.metrics().rows(), view.size() - firstVisible));
 
+        // 悬停判定与绘制合一：格子互不重叠，命中哪个就画哪个的高亮，省掉一次遍历
         int hovered = -1;
-        for (int i = 0; i < visibleCount; i++) {
-            Rect cell = layout.cellRectByIndex(firstVisible + i, scrollRow);
-            if (cell.contains(mouseX, mouseY)) hovered = firstVisible + i;
-        }
-
         for (int i = 0; i < visibleCount; i++) {
             int flatIndex = firstVisible + i;
             Rect cell = layout.cellRectByIndex(flatIndex, scrollRow);
-            BundleEntry<S> entry = view.get(flatIndex);
-            boolean selected = flatIndex == hovered;
+            boolean underCursor = cell.contains(mouseX, mouseY);
+            if (underCursor) hovered = flatIndex;
 
             drawSlot(graphics, cell);
-            graphics.drawItemWithCount(entry.stack(), cell.x() + (cell.width() - 16) / 2,
-                    cell.y() + (cell.height() - 16) / 2);
-            if (selected) highlightSlot(graphics, cell);
+            graphics.drawItemWithCount(view.get(flatIndex).stack(),
+                    cell.x() + (cell.width() - 16) / 2, cell.y() + (cell.height() - 16) / 2);
+            if (underCursor) highlightSlot(graphics, cell);
         }
 
         if (request.model().bundleCount() == 0) {
@@ -137,7 +122,7 @@ public final class BundlePanelRenderer<S> {
         PanelGraphics<S> graphics = request.graphics();
         String hint = graphics.translate("bundlestash.no_bundle");
         graphics.centeredText(hint, grid.x() + grid.width() / 2,
-                grid.y() + grid.height() / 2 - 4, COLOR_TEXT_DIM);
+                grid.y() + grid.height() / 2 - 4, PanelPalette.TEXT_DIM);
     }
 
     /** 界面角落的开关按钮：面板隐藏时也显示，方便随时呼出。 */
@@ -150,20 +135,25 @@ public final class BundlePanelRenderer<S> {
                 button.x() + (button.width() - 16) / 2, button.y() + (button.height() - 16) / 2);
         if (hovered) highlightSlot(graphics, button);
         if (panelVisible) {
-            graphics.fill(new Rect(button.x() + 3, button.bottom() - 3, button.width() - 6, 2), COLOR_ACCENT);
+            graphics.fill(new Rect(button.x() + 3, button.bottom() - 3, button.width() - 6, 2), PanelPalette.ACCENT);
+        }
+    }
+
+    /** 界面角落的设置按钮：面板隐藏时也显示，点开可改网格行数/列数。 */
+    public void drawSettingsButton(PanelLayout layout, PanelGraphics<S> graphics,
+                                   double mouseX, double mouseY) {
+        Rect button = layout.settingsButton();
+        boolean hovered = button.contains(mouseX, mouseY);
+        drawSlot(graphics, button);
+        graphics.drawItem(graphics.iconOf("minecraft:comparator"),
+                button.x() + (button.width() - 16) / 2, button.y() + (button.height() - 16) / 2);
+        if (hovered) {
+            highlightSlot(graphics, button);
+            graphics.showTextTooltip(graphics.translate("bundlestash.settings"), (int) mouseX, (int) mouseY);
         }
     }
 
     // ------------------------------------------------------------ 基础图元
-
-    /** 原版容器式底板：浅灰底 + 深色描边。 */
-    private void drawPanelBackground(PanelGraphics<S> graphics, Rect panel) {
-        graphics.fill(panel, COLOR_PANEL_BG);
-        graphics.fill(new Rect(panel.x(), panel.y(), panel.width(), 1), COLOR_PANEL_BORDER);
-        graphics.fill(new Rect(panel.x(), panel.bottom() - 1, panel.width(), 1), COLOR_PANEL_BORDER);
-        graphics.fill(new Rect(panel.x(), panel.y(), 1, panel.height()), COLOR_PANEL_BORDER);
-        graphics.fill(new Rect(panel.right() - 1, panel.y(), 1, panel.height()), COLOR_PANEL_BORDER);
-    }
 
     /** 画一个槽位（格子/分类按钮/开关按钮共用）。 */
     private void drawSlot(PanelGraphics<S> graphics, Rect rect) {
@@ -172,8 +162,7 @@ public final class BundlePanelRenderer<S> {
 
     private void highlightSlot(PanelGraphics<S> graphics, Rect rect) {
         // 外扩 HIGHLIGHT_PADDING 抵消九宫格贴图自带的透明边，可见高亮正好铺满 rect
-        Rect target = new Rect(rect.x() - HIGHLIGHT_PADDING, rect.y() - HIGHLIGHT_PADDING,
-                rect.width() + HIGHLIGHT_PADDING * 2, rect.height() + HIGHLIGHT_PADDING * 2);
+        Rect target = rect.expanded(HIGHLIGHT_PADDING);
         graphics.sprite(SPRITE_SLOT_HOVER_BACK, target);
         graphics.sprite(SPRITE_SLOT_HOVER_FRONT, target);
     }
@@ -188,7 +177,7 @@ public final class BundlePanelRenderer<S> {
         String query = request.state().query();
         if (query.isEmpty()) {
             String hint = request.graphics().translate("bundlestash.search");
-            request.graphics().drawText(hint, bar.x() + 4, bar.y() + (bar.height() - 8) / 2, COLOR_TEXT_DIM, false);
+            request.graphics().drawText(hint, bar.x() + 4, bar.y() + (bar.height() - 8) / 2, PanelPalette.TEXT_DIM, false);
         }
     }
 
@@ -200,20 +189,27 @@ public final class BundlePanelRenderer<S> {
         double mouseY = request.mouseY();
 
         List<Rect> buttons = layout.categoryButtons();
-        for (int i = 0; i < buttons.size() && i < categories.length; i++) {
+        for (int i = 0; i < buttons.size() && i < categories.size(); i++) {
             Rect button = buttons.get(i);
-            ItemCategory category = categories[i];
+            ItemCategory category = categories.get(i);
             boolean selected = state.category() == category;
             boolean hovered = button.contains(mouseX, mouseY);
 
             drawSlot(graphics, button);
 
-            int iconSize = 16;
-            int offset = Math.max(0, (Math.min(button.width(), button.height()) - iconSize) / 2);
-            graphics.drawItem(graphics.iconOf(category.iconItemId()), button.x() + offset, button.y() + offset);
+            // 小图标靠左摆放，选中的按钮在图标右侧展开分类名
+            Rect icon = layout.categoryIconRect(i);
+            if (icon != null) {
+                graphics.drawItem(graphics.iconOf(category.iconItemId()), icon.x(), icon.y());
+            }
+            if (selected) {
+                String label = graphics.translate(category.translationKey());
+                graphics.drawText(label, layout.categoryLabelStart(i),
+                        button.y() + (button.height() - 8) / 2, PanelPalette.TEXT, false);
+            }
             if (selected || hovered) highlightSlot(graphics, button);
 
-            // 分类名走原版 tooltip
+            // 悬浮时分类名走原版 tooltip
             if (hovered) {
                 graphics.showTextTooltip(graphics.translate(category.translationKey()), (int) mouseX, (int) mouseY);
             }
@@ -260,6 +256,6 @@ public final class BundlePanelRenderer<S> {
         }
         graphics.sprite(SPRITE_BAR_BORDER, footer);
         graphics.centeredText(label, footer.x() + footer.width() / 2,
-                footer.y() + (footer.height() - 8) / 2, COLOR_TEXT);
+                footer.y() + (footer.height() - 8) / 2, PanelPalette.TEXT);
     }
 }

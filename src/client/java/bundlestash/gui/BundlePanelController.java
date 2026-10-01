@@ -15,11 +15,12 @@ import bundlestash.platform.McAccess;
 import bundlestash.platform.McGraphics;
 import bundlestash.platform.SearchField;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.client.gui.screens.inventory.InventoryScreen;
 import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.network.chat.Component;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
 
@@ -31,7 +32,7 @@ import java.util.List;
  */
 public final class BundlePanelController {
 
-    private static final ItemCategory[] CATEGORIES = ItemCategory.values();
+    private static final List<ItemCategory> CATEGORIES = List.of(ItemCategory.values());
 
     /** 快照刷新间隔：服务端每次同步都要上百毫秒，本地没必要每帧重算。 */
     private static final long MODEL_REFRESH_MS = 100L;
@@ -39,13 +40,16 @@ public final class BundlePanelController {
     private final PanelState state;
     private final BundlePanelRenderer<ItemStack> renderer = new BundlePanelRenderer<>(CATEGORIES);
     private final SearchField searchField;
+    private final SettingsPopup<ItemStack> settingsPopup = new SettingsPopup<>();
 
-    private BundleConfig config = new BundleConfig();
+    private final BundleConfig config;
     private BundleModel<ItemStack> model = BundleModel.empty();
     private List<BundleEntry<ItemStack>> view = List.of();
     private PanelLayout layout;
     private int hoveredBundleSlot = -1;
     private long lastModelUpdateMs = -1L;
+    private int lastFingerprint;
+    private boolean fingerprintValid;
     private boolean viewDirty = true;
 
     public BundlePanelController(Romanizer romanizer, BundleConfig config) {
@@ -70,25 +74,41 @@ public final class BundlePanelController {
         return searchField;
     }
 
-    public ItemCategory[] categories() {
-        return CATEGORIES;
-    }
-
-    public void setConfig(BundleConfig config) {
-        this.config = config;
-    }
-
     // ------------------------------------------------------------ 布局
 
-    public PanelLayout layoutFor(Rect screenRect) {
+    private PanelLayout layoutFor(Rect screenRect) {
         PanelMetrics metrics = baseMetrics().withRowsFitting(McAccess.windowHeight() - screenRect.y() - 4);
         PanelLayout.Side side = preferredSide();
-        PanelLayout layout = new PanelLayout(screenRect, side, metrics, CATEGORIES.length);
-        if (!layout.fitsHorizontally(windowWidth())) {
+        int windowWidth = windowWidth();
+        PanelLayout.CategoryTabs tabs = categoryTabs();
+        PanelLayout layout = new PanelLayout(screenRect, side, metrics, windowWidth, tabs);
+        if (!layout.fitsHorizontally(windowWidth)) {
             // 界面靠边时会画到屏幕外，自动换到另一侧
-            layout = new PanelLayout(screenRect, opposite(side), metrics, CATEGORIES.length);
+            layout = new PanelLayout(screenRect, opposite(side), metrics, windowWidth, tabs);
         }
         return layout;
+    }
+
+    /**
+     * 顶部分类条的参数：分类数量、当前选中下标、以及选中分类名的文字宽度。
+     * 只有选中的按钮会画文字，其余只画小图标，所以只量一个字符串；
+     * 文字宽度要量字体，只能在拿得到 Minecraft 的这一层算，再传给纯几何的 {@link PanelLayout}。
+     */
+    private PanelLayout.CategoryTabs categoryTabs() {
+        Font font = Minecraft.getInstance().font;
+        int selected = -1;
+        for (int i = 0; i < CATEGORIES.size(); i++) {
+            if (CATEGORIES.get(i) == state.category()) {
+                selected = i;
+                break;
+            }
+        }
+        int labelWidth = 0;
+        if (selected >= 0 && font != null) {
+            String label = Component.translatable(CATEGORIES.get(selected).translationKey()).getString();
+            labelWidth = font.width(label);
+        }
+        return new PanelLayout.CategoryTabs(CATEGORIES.size(), selected, labelWidth);
     }
 
     /** 合成书打开时占用界面左侧，把面板让到右边去。 */
@@ -107,16 +127,11 @@ public final class BundlePanelController {
     private PanelMetrics baseMetrics() {
         // gap 取 1：格子之间留一线，经典槽位贴图才看得出是一个个格子而不是一整块
         return new PanelMetrics(config.columns, config.rows, config.cellSize, 1, 6, config.screenGap,
-                22, 6, config.searchEnabled ? 16 : 0, 15);
+                6, config.searchEnabled ? 16 : 0, 15);
     }
 
     private static int windowWidth() {
         return Minecraft.getInstance().getWindow().getGuiScaledWidth();
-    }
-
-    /** 最近一次算出的布局，未渲染过则为 {@code null}。 */
-    public PanelLayout layout() {
-        return layout;
     }
 
     // ------------------------------------------------------------ 显示状态
@@ -133,18 +148,22 @@ public final class BundlePanelController {
 
     // ------------------------------------------------------------ 渲染
 
-    public void render(AbstractContainerScreen<?> screen, Rect screenRect,
-                       GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
+    public void render(Rect screenRect, GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
         long now = System.currentTimeMillis();
         if (now - lastModelUpdateMs >= MODEL_REFRESH_MS) {
-            // 包含空收纳袋：bundleCount() 才能如实反映"背包里有没有收纳袋"，
-            // 空收纳袋没有条目，不会出现在视图里，因此不影响展示
-            this.model = McAccess.collectBundles(true);
             this.lastModelUpdateMs = now;
-            this.viewDirty = true;
+            // 先用无分配的指纹问一句"背包动过吗"：没动就整份跳过快照重建与视图重算，
+            // 动了才采集（含空收纳袋：bundleCount() 才能如实反映"背包里有没有收纳袋"）
+            int fingerprint = McAccess.snapshotFingerprint();
+            if (!fingerprintValid || fingerprint != lastFingerprint) {
+                this.fingerprintValid = true;
+                this.lastFingerprint = fingerprint;
+                this.model = McAccess.collectBundles(true);
+                this.viewDirty = true;
+            }
         }
         if (viewDirty) {
-            this.view = state.computeView(model);
+            this.view = state.computeView(model, McAccess::nameOf);
             this.viewDirty = false;
         }
         this.layout = layoutFor(screenRect);
@@ -152,14 +171,26 @@ public final class BundlePanelController {
         McGraphics mcGraphics = new McGraphics(graphics);
         if (config.toggleButton) {
             renderer.drawToggleButton(layout, mcGraphics, mouseX, mouseY, panelActive());
+            renderer.drawSettingsButton(layout, mcGraphics, mouseX, mouseY);
         }
 
-        if (!panelActive()) {
+        if (panelActive()) {
+            renderPanel(screenRect, graphics, mcGraphics, mouseX, mouseY, partialTick);
+        } else {
             searchField.setVisible(false);
             hoveredBundleSlot = -1;
-            return;
         }
 
+        // 弹窗画在最上层，面板隐藏时也要能设置
+        if (settingsPopup.isOpen()) {
+            settingsPopup.layout(screenRect);
+            settingsPopup.render(mcGraphics, config, mouseX, mouseY);
+        }
+    }
+
+    /** 面板本体（搜索框、网格、底部统计）以及面板上方的浮动物品补画。 */
+    private void renderPanel(Rect screenRect, GuiGraphicsExtractor graphics, McGraphics mcGraphics,
+                             int mouseX, int mouseY, float partialTick) {
         PanelMetrics metrics = layout.metrics();
         state.clampScroll(rowsOf(view.size(), metrics.columns()), metrics);
 
@@ -178,7 +209,6 @@ public final class BundlePanelController {
         // 导致往面板里放/从面板里取时看不清具体是什么
         drawCarriedOnTop(graphics, mouseX, mouseY);
 
-        state.setHoveredIndex(hovered);
         hoveredBundleSlot = hovered >= 0 && hovered < view.size()
                 ? model.groups().get(view.get(hovered).groupIndex()).containerSlot()
                 : -1;
@@ -219,11 +249,32 @@ public final class BundlePanelController {
         double mouseX = event.x();
         double mouseY = event.y();
 
+        // 设置弹窗打开时按模态处理：点内部操作控件，点外部关闭，一律吞掉事件
+        if (settingsPopup.isOpen()) {
+            settingsPopup.layout(screenRect);
+            if (settingsPopup.bounds().contains(mouseX, mouseY)) {
+                if (settingsPopup.closeButton().contains(mouseX, mouseY)) {
+                    settingsPopup.close();
+                } else if (settingsPopup.handleClick(mouseX, mouseY, config)) {
+                    BetterBundleMod.instance().saveConfig();
+                    viewDirty = true;
+                }
+            } else {
+                settingsPopup.close();
+            }
+            return true;
+        }
+
         if (config.toggleButton && layout.toggleButton().contains(mouseX, mouseY)) {
             if (event.button() == 1) {
                 state.toggleVisible();
                 BetterBundleMod.instance().saveConfig();
             }
+            return true;
+        }
+
+        if (config.toggleButton && layout.settingsButton().contains(mouseX, mouseY)) {
+            if (event.button() == 0) settingsPopup.open();
             return true;
         }
 
@@ -237,7 +288,7 @@ public final class BundlePanelController {
 
         int categoryIndex = layout.categoryIndexAt(mouseX, mouseY);
         if (categoryIndex >= 0) {
-            state.setCategory(CATEGORIES[categoryIndex]);
+            state.setCategory(CATEGORIES.get(categoryIndex));
             viewDirty = true;
             searchField.unfocus();
             BetterBundleMod.instance().saveConfig();
@@ -272,7 +323,19 @@ public final class BundlePanelController {
 
     /** 侧栏区域内的抬起事件一律吞掉，避免 vanilla 把鼠标上的东西丢到地上。 */
     public boolean mouseReleased(MouseButtonEvent event) {
+        if (settingsPopup.isOpen()) return true;
         return layout != null && panelActive() && layout.panel().contains(event.x(), event.y());
+    }
+
+    /**
+     * Esc 键：设置弹窗打开时先关弹窗，避免这一下直接关掉容器界面。
+     *
+     * @return 是否已消费这次按键
+     */
+    public boolean onEscape() {
+        if (!settingsPopup.isOpen()) return false;
+        settingsPopup.close();
+        return true;
     }
 
     public boolean mouseScrolled(double mouseX, double mouseY, double scrollDelta) {
@@ -287,14 +350,6 @@ public final class BundlePanelController {
     public boolean handleBulkInsert(Slot slot) {
         if (!panelActive()) return false;
         return BundleActions.stashSlot(McAccess.collectBundles(true), slot);
-    }
-
-    public List<BundleEntry<ItemStack>> view() {
-        return view;
-    }
-
-    public BundleModel<ItemStack> model() {
-        return model;
     }
 
     private boolean carriedIsNotEmpty() {
