@@ -8,6 +8,6 @@
   "bundlestash.category.tools": "Tools & equipment",
   "bundlestash.category.minerals": "Minerals",
   "bundlestash.category.misc": "Misc",
-  "modmenu.name.bundle-stash": "Bundle Stash",
-  "modmenu.description.bundle-stash": "Shows the contents of all your bundles in a sidebar on container screens, with categories, search, and one-click deposit/withdraw."
+  "modmenu.nameTranslation.bundle-stash": "Bundle Stash",
+  "modmenu.descriptionTranslation.bundle-stash": "Shows the contents of all your bundles in a sidebar on container screens, with categories, search, and one-click deposit/withdraw."
 }
