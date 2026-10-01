@@ -21,8 +21,8 @@ public final class PanelLayout {
 
     /** 分类按钮里小图标的边长。 */
     public static final int CATEGORY_ICON = 16;
-    /** 分类按钮高度。 */
-    public static final int CATEGORY_BUTTON_H = 18;
+    /** 分类按钮高度（= 原版按钮贴图 {@code widget/button} 的原生高度 20，图标上下各留 2px）。 */
+    public static final int CATEGORY_BUTTON_H = 20;
     /** 分类按钮内部的水平留白。 */
     public static final int CATEGORY_PAD = 3;
     /** 分类按钮之间的间距。 */

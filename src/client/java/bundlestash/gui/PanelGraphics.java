@@ -46,4 +46,22 @@ public interface PanelGraphics<S> {
         fill(new Rect(rect.x(), rect.y(), 1, rect.height()), PanelPalette.BORDER);
         fill(new Rect(rect.right() - 1, rect.y(), 1, rect.height()), PanelPalette.BORDER);
     }
+
+    /**
+     * 原版按钮底：{@code widget/button} 自带九宫格（mcmeta border=3），
+     * 拉到任意尺寸都是干净的圆角，不会像无九宫格贴图那样被拉糊。
+     *
+     * @param hovered 悬停/选中时改用高亮版
+     */
+    default void buttonBackground(Rect rect, boolean hovered) {
+        sprite(hovered ? "minecraft:widget/button_highlighted" : "minecraft:widget/button", rect);
+    }
+
+    /**
+     * 关闭按钮底：{@code widget/cross_button} 是 14×14 的原生贴图（没有九宫格定义），
+     * 必须按原尺寸绘制，缩放会把它拉糊。
+     */
+    default void closeButtonBackground(Rect rect, boolean hovered) {
+        sprite(hovered ? "minecraft:widget/cross_button_highlighted" : "minecraft:widget/cross_button", rect);
+    }
 }

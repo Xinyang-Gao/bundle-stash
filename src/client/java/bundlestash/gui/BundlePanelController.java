@@ -171,7 +171,7 @@ public final class BundlePanelController {
         McGraphics mcGraphics = new McGraphics(graphics);
         if (config.toggleButton) {
             renderer.drawToggleButton(layout, mcGraphics, mouseX, mouseY, panelActive());
-            renderer.drawSettingsButton(layout, mcGraphics, mouseX, mouseY);
+            renderer.drawSettingsButton(layout, mcGraphics, mouseX, mouseY, settingsPopup.isOpen());
         }
 
         if (panelActive()) {
@@ -252,10 +252,11 @@ public final class BundlePanelController {
         // 设置弹窗打开时按模态处理：点内部操作控件，点外部关闭，一律吞掉事件
         if (settingsPopup.isOpen()) {
             settingsPopup.layout(screenRect);
+            boolean leftClick = McAccess.isLeftClick(event);
             if (settingsPopup.bounds().contains(mouseX, mouseY)) {
                 if (settingsPopup.closeButton().contains(mouseX, mouseY)) {
-                    settingsPopup.close();
-                } else if (settingsPopup.handleClick(mouseX, mouseY, config)) {
+                    if (leftClick) settingsPopup.close();
+                } else if (leftClick && settingsPopup.handleClick(mouseX, mouseY, config)) {
                     BetterBundleMod.instance().saveConfig();
                     viewDirty = true;
                 }
@@ -265,8 +266,9 @@ public final class BundlePanelController {
             return true;
         }
 
+        // 角落按钮只响应左键（26.3 起 event.button() 是 SDL 编号，左键 = 1）
         if (config.toggleButton && layout.toggleButton().contains(mouseX, mouseY)) {
-            if (event.button() == 1) {
+            if (McAccess.isLeftClick(event)) {
                 state.toggleVisible();
                 BetterBundleMod.instance().saveConfig();
             }
@@ -274,7 +276,7 @@ public final class BundlePanelController {
         }
 
         if (config.toggleButton && layout.settingsButton().contains(mouseX, mouseY)) {
-            if (event.button() == 0) settingsPopup.open();
+            if (McAccess.isLeftClick(event)) settingsPopup.open();
             return true;
         }
 
@@ -288,10 +290,13 @@ public final class BundlePanelController {
 
         int categoryIndex = layout.categoryIndexAt(mouseX, mouseY);
         if (categoryIndex >= 0) {
-            state.setCategory(CATEGORIES.get(categoryIndex));
-            viewDirty = true;
+            // 分类按钮同样只认左键
+            if (McAccess.isLeftClick(event)) {
+                state.setCategory(CATEGORIES.get(categoryIndex));
+                viewDirty = true;
+                BetterBundleMod.instance().saveConfig();
+            }
             searchField.unfocus();
-            BetterBundleMod.instance().saveConfig();
             return true;
         }
 

@@ -13,11 +13,12 @@ import bundlestash.core.Rect;
  */
 public final class SettingsPopup<S> {
 
-    private static final String SPRITE_CONTROL = "minecraft:container/slot";
-
     private static final int WIDTH = 132;
     private static final int HEIGHT = 64;
-    private static final int CONTROL = 14;
+    /** 加减控件：18×18，按钮底走九宫格，任意尺寸都不失真。 */
+    private static final int CONTROL = 18;
+    /** 关闭按钮：widget/cross_button 是 14×14 原生贴图，必须按原尺寸画。 */
+    private static final int CLOSE = 14;
     private static final int VALUE_W = 26;
     private static final int PAD = 8;
     private static final int ROW_1 = 22;
@@ -32,7 +33,7 @@ public final class SettingsPopup<S> {
     private boolean open;
 
     private Rect bounds = new Rect(0, 0, WIDTH, HEIGHT);
-    private Rect closeButton = new Rect(0, 0, 12, 12);
+    private Rect closeButton = new Rect(0, 0, CLOSE, CLOSE);
     private Rect rowsMinus = new Rect(0, 0, CONTROL, CONTROL);
     private Rect rowsPlus = new Rect(0, 0, CONTROL, CONTROL);
     private Rect colsMinus = new Rect(0, 0, CONTROL, CONTROL);
@@ -64,7 +65,7 @@ public final class SettingsPopup<S> {
         int x = screen.x() + (screen.width() - WIDTH) / 2;
         int y = screen.y() + (screen.height() - HEIGHT) / 2;
         this.bounds = new Rect(x, y, WIDTH, HEIGHT);
-        this.closeButton = new Rect(x + WIDTH - PAD - 12, y + 4, 12, 12);
+        this.closeButton = new Rect(x + WIDTH - PAD - CLOSE, y + 5, CLOSE, CLOSE);
 
         int plusX = x + WIDTH - PAD - CONTROL;
         int minusX = plusX - 2 - CONTROL;
@@ -82,7 +83,8 @@ public final class SettingsPopup<S> {
         graphics.centeredText(graphics.translate("bundlestash.settings.title"),
                 bounds.x() + bounds.width() / 2, bounds.y() + 5, PanelPalette.TEXT);
 
-        drawControl(graphics, closeButton, "X", mouseX, mouseY);
+        // 原生 14×14 的叉号按钮，自带悬停高亮，不再手写 "X" 字形
+        graphics.closeButtonBackground(closeButton, closeButton.contains(mouseX, mouseY));
 
         drawRow(graphics, "bundlestash.settings.rows", config.rows, rowsMinus, rowsPlus, mouseX, mouseY);
         drawRow(graphics, "bundlestash.settings.columns", config.columns, colsMinus, colsPlus, mouseX, mouseY);
@@ -126,9 +128,12 @@ public final class SettingsPopup<S> {
 
     private void drawControl(PanelGraphics<S> graphics, Rect rect, String glyph,
                              double mouseX, double mouseY) {
-        graphics.sprite(SPRITE_CONTROL, rect);
-        int color = rect.contains(mouseX, mouseY) ? PanelPalette.TEXT : PanelPalette.TEXT_DIM;
-        graphics.centeredText(glyph, rect.x() + rect.width() / 2, rect.y() + 3, color);
+        boolean hovered = rect.contains(mouseX, mouseY);
+        graphics.buttonBackground(rect, hovered);
+        // 按钮底是 #B1B1B1 的中灰：常态用深色字保证可读，悬停换强调色给出反馈
+        int color = hovered ? PanelPalette.ACCENT : PanelPalette.TEXT;
+        graphics.centeredText(glyph, rect.x() + rect.width() / 2,
+                rect.y() + (rect.height() - 8) / 2, color);
     }
 
     private static int clamp(int value, int min, int max) {

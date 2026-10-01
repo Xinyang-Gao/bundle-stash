@@ -18,9 +18,11 @@ import java.util.List;
  * 视觉上完全照搬原版容器：
  * <ul>
  *   <li>面板底 → 原版容器灰 {@code #C6C6C6} 加 1px 深色描边</li>
- *   <li>格子 → {@code container/slot}（箱子/背包里那套经典凹槽，1:1 像素对齐）</li>
+ *   <li>格子 → {@code container/slot}（18×18 原生 1:1 绘制，绝不缩放）</li>
+ *   <li>按钮（分类条/角落开关/设置）→ {@code widget/button}，九宫格任意尺寸不失真，
+ *       悬停与选中用 {@code widget/button_highlighted}</li>
  *   <li>悬停 → {@code container/slot_highlight_back/front}</li>
- *   <li>滚动条 → {@code widget/scroller_background} / {@code widget/scroller}</li>
+ *   <li>滚动条 → {@code widget/scroller_background} / {@code widget/scroller}（九宫格）</li>
  *   <li>输入框 → {@code widget/text_field}（聚焦时用 highlighted 版本）</li>
  *   <li>底部 → 原版收纳袋进度条 {@code container/bundle/bundle_progressbar_*}</li>
  * </ul>
@@ -130,32 +132,35 @@ public final class BundlePanelRenderer<S> {
                                  double mouseX, double mouseY, boolean panelVisible) {
         Rect button = layout.toggleButton();
         boolean hovered = button.contains(mouseX, mouseY);
-        drawSlot(graphics, button);
+        graphics.buttonBackground(button, hovered);
         graphics.drawItem(graphics.iconOf("minecraft:bundle"),
                 button.x() + (button.width() - 16) / 2, button.y() + (button.height() - 16) / 2);
-        if (hovered) highlightSlot(graphics, button);
         if (panelVisible) {
-            graphics.fill(new Rect(button.x() + 3, button.bottom() - 3, button.width() - 6, 2), PanelPalette.ACCENT);
+            // 面板已展开：在按钮下沿（3px 边框区内、图标之下）画一道强调线
+            graphics.fill(new Rect(button.x() + 4, button.bottom() - 2, button.width() - 8, 2),
+                    PanelPalette.ACCENT);
+        }
+        if (hovered) {
+            graphics.showTextTooltip(graphics.translate("bundlestash.toggle"), (int) mouseX, (int) mouseY);
         }
     }
 
     /** 界面角落的设置按钮：面板隐藏时也显示，点开可改网格行数/列数。 */
     public void drawSettingsButton(PanelLayout layout, PanelGraphics<S> graphics,
-                                   double mouseX, double mouseY) {
+                                   double mouseX, double mouseY, boolean active) {
         Rect button = layout.settingsButton();
         boolean hovered = button.contains(mouseX, mouseY);
-        drawSlot(graphics, button);
+        graphics.buttonBackground(button, hovered || active);
         graphics.drawItem(graphics.iconOf("minecraft:comparator"),
                 button.x() + (button.width() - 16) / 2, button.y() + (button.height() - 16) / 2);
         if (hovered) {
-            highlightSlot(graphics, button);
             graphics.showTextTooltip(graphics.translate("bundlestash.settings"), (int) mouseX, (int) mouseY);
         }
     }
 
     // ------------------------------------------------------------ 基础图元
 
-    /** 画一个槽位（格子/分类按钮/开关按钮共用）。 */
+    /** 画一个槽位底（网格格子专用，18×18 原生贴图按原尺寸绘制）。 */
     private void drawSlot(PanelGraphics<S> graphics, Rect rect) {
         graphics.sprite(SPRITE_SLOT, rect);
     }
@@ -195,7 +200,8 @@ public final class BundlePanelRenderer<S> {
             boolean selected = state.category() == category;
             boolean hovered = button.contains(mouseX, mouseY);
 
-            drawSlot(graphics, button);
+            // 分类按钮是"按钮"不是"格子"：用九宫格按钮底，选中/悬停换高亮版
+            graphics.buttonBackground(button, selected || hovered);
 
             // 小图标靠左摆放，选中的按钮在图标右侧展开分类名
             Rect icon = layout.categoryIconRect(i);
@@ -207,7 +213,6 @@ public final class BundlePanelRenderer<S> {
                 graphics.drawText(label, layout.categoryLabelStart(i),
                         button.y() + (button.height() - 8) / 2, PanelPalette.TEXT, false);
             }
-            if (selected || hovered) highlightSlot(graphics, button);
 
             // 悬浮时分类名走原版 tooltip
             if (hovered) {

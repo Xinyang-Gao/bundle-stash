@@ -6,6 +6,7 @@ import bundlestash.core.BundleModel;
 import bundlestash.core.BundleWeights;
 import bundlestash.core.ItemTraits;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.client.multiplayer.ClientPacketListener;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.core.component.DataComponents;
@@ -299,6 +300,26 @@ public final class McAccess {
         if (client.player == null || client.gameMode == null) return;
         client.gameMode.handleContainerInput(client.player.containerMenu.containerId, slotId, button, action,
                 client.player);
+    }
+
+    // ------------------------------------------------------------ 鼠标按键
+
+    /**
+     * 26.3 起鼠标事件改用 SDL 编号：1 = 左键、2 = 中键、3 = 右键——vanilla 自己也是按这套判断的
+     * （见 {@code AbstractContainerScreen#getContainerClickButton}）。
+     * <p>
+     * 这与"容器点击"的 0 = 主键 / 1 = 副键是两套编号，{@link #sendClick} 用的是后者。
+     */
+    public static final int MOUSE_LEFT = 1;
+    public static final int MOUSE_MIDDLE = 2;
+    public static final int MOUSE_RIGHT = 3;
+
+    public static boolean isLeftClick(MouseButtonEvent event) {
+        return event.button() == MOUSE_LEFT;
+    }
+
+    public static boolean isRightClick(MouseButtonEvent event) {
+        return event.button() == MOUSE_RIGHT;
     }
 
     // ------------------------------------------------------------ 目标槽位

@@ -3,6 +3,54 @@
 本项目的所有重要变更都记录在此文件。
 All notable changes to this project are documented in this file.
 
+## [0.2.1-beta] - 2026-10-02
+
+### English
+
+**Fixed**
+
+- The settings button did nothing when clicked. Minecraft 26.3 moved mouse input to SDL
+  numbering (1 = left, 2 = middle, 3 = right) while the sidebar still checked GLFW numbers,
+  so the "left click" check (`button == 0`) could never match. Corner buttons, category tabs
+  and popup controls now go through `McAccess.isLeftClick`, matching vanilla's own checks
+  (`AbstractContainerScreen#getContainerClickButton` maps 1 and 3 the same way).
+- The panel toggle was written for right click but effectively reacted to left click; all
+  sidebar buttons now consistently respond to left clicks only.
+
+**GUI**
+
+- Every button now uses the vanilla nine-sliced `widget/button` (with
+  `widget/button_highlighted` for hover/selection) instead of the 18x18 `container/slot`
+  texture stretched to 20x20, 22x18, 14x14 and 12x12. Buttons stay crisp at any size and
+  gain vanilla hover feedback; grid cells keep the slot texture at its native 18x18.
+- Category bar height changed from 18 to 20 px, the native height of vanilla buttons;
+  icon and label paddings are unchanged.
+- Settings popup: the +/- controls grew from 14x14 to 18x18 on proper button textures, and
+  the hand-drawn "X" close button was replaced by the native 14x14 `widget/cross_button`
+  with its highlighted hover variant.
+- The settings button stays highlighted while its popup is open, and the panel toggle gained
+  a hover tooltip.
+
+### 中文
+
+**修复**
+
+- 设置按钮点击无效。26.3 起鼠标输入改用 SDL 编号（1 = 左键、2 = 中键、3 = 右键），
+  而侧栏仍按 GLFW 编号判断，"左键 = 0"永远不成立。角落按钮、分类按钮与弹窗控件现在统一
+  走 `McAccess.isLeftClick`，与 vanilla 的判断方式一致（`AbstractContainerScreen`
+  的 `getContainerClickButton` 同样按 1/3 处理）。
+- 开关按钮原代码本意是右键触发，实际却响应了左键；现在侧栏所有按钮统一只响应左键。
+
+**界面**
+
+- 所有按钮改用原版九宫格贴图 `widget/button`（悬停/选中用 `widget/button_highlighted`），
+  不再把 18x18 的 `container/slot` 分别拉伸成 20x20、22x18、14x14、12x12——任意尺寸都
+  清晰锐利，并获得原版悬停反馈；网格格子仍以原生 18x18 使用槽位贴图。
+- 分类条高度 18 → 20（原版按钮的原生高度），图标与文字留白不变。
+- 设置弹窗：加减控件 14x14 → 18x18 并使用真正的按钮贴图；手写的 "X" 关闭按钮换成原生
+  14x14 的 `widget/cross_button`（带悬停高亮变体）。
+- 弹窗打开时设置按钮保持高亮态；开关按钮补充悬停提示。
+
 ## [0.2.0-beta] - 2026-10-02
 
 ### English
