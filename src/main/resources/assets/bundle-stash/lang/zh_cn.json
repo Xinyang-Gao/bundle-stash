@@ -9,6 +9,8 @@
   "bundlestash.category.minerals": "矿物",
   "bundlestash.category.misc": "杂物",
   "bundlestash.no_bundle": "背包里没有收纳袋",
+  "bundlestash.no_bundle_contents": "收纳袋里装的都是空气",
+  "bundlestash.no_match": "袋子们翻了个遍，啥也没找着",
   "bundlestash.toggle": "显示/隐藏侧栏",
   "bundlestash.settings": "设置",
   "bundlestash.settings.title": "设置",

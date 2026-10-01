@@ -106,11 +106,9 @@ public final class BundlePanelRenderer<S> {
             if (underCursor) highlightSlot(graphics, cell);
         }
 
-        if (request.model().bundleCount() == 0) {
-            drawEmptyHint(request);
-        } else {
-            drawFooter(request, hovered);
-        }
+        // 网格空了就给一句提示（并按"为什么空"选文案），底部统计照常画
+        if (view.isEmpty()) drawEmptyHint(request);
+        if (request.model().bundleCount() > 0) drawFooter(request, hovered);
 
         if (hovered >= 0) {
             graphics.showTooltip(view.get(hovered).stack(), (int) mouseX, (int) mouseY);
@@ -118,12 +116,22 @@ public final class BundlePanelRenderer<S> {
         return hovered;
     }
 
-    /** 背包里一个收纳袋都没有时，在网格区域居中给一句提示。 */
+    /**
+     * 网格空了时在中央给一句提示，按三种"空法"分别取文案：
+     * 背包里没有收纳袋 / 有袋子但全是空的 / 有内容但当前筛选（分类或搜索）没命中。
+     */
     private void drawEmptyHint(Request<S> request) {
-        Rect grid = request.layout().grid();
         PanelGraphics<S> graphics = request.graphics();
-        String hint = graphics.translate("bundlestash.no_bundle");
-        graphics.centeredText(hint, grid.x() + grid.width() / 2,
+        String key;
+        if (request.model().bundleCount() == 0) {
+            key = "bundlestash.no_bundle";
+        } else if (request.model().itemCount() == 0) {
+            key = "bundlestash.no_bundle_contents";
+        } else {
+            key = "bundlestash.no_match";
+        }
+        Rect grid = request.layout().grid();
+        graphics.centeredText(graphics.translate(key), grid.x() + grid.width() / 2,
                 grid.y() + grid.height() / 2 - 4, PanelPalette.TEXT_DIM);
     }
 

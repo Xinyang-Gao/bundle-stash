@@ -1,5 +1,7 @@
 # Bundle Stash（探囊取物）
 
+![模组图标](src/main/resources/assets/bundle-stash/icon.png)
+
 在容器界面（箱子、背包、熔炉……）侧边显示玩家背包里**所有收纳袋的内容**，
 带分类、搜索与一键存取的 Fabric 客户端模组。
 

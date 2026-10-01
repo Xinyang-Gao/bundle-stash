@@ -196,18 +196,20 @@ public final class PanelLayout {
         return panel.contains(mouseX, mouseY);
     }
 
-    /** 把滚动行号夹到合法区间。 */
-    public int clampScroll(int scrollRow, int totalRows) {
-        return Math.max(0, Math.min(scrollRow, Math.max(0, totalRows - metrics.rows())));
-    }
-
-    /** 滚动条滑块矩形；不需要滚动时返回 {@code null}。 */
+    /**
+     * 滚动条滑块矩形；不需要滚动时返回 {@code null}。
+     * <p>
+     * 滑块位置 = 轨道行程 ×（当前滚动行 / 最大滚动量）。当前行必须夹到
+     * {@code [0, maxScroll]}——历史上这里错把 {@code maxScroll} 当"总行数"传给了
+     * 另一个夹取函数，导致总行数不足两屏时上界恒为 0、滑块永远钉在顶端。
+     */
     public Rect scrollbarThumb(int scrollRow, int totalRows) {
         int maxScroll = Math.max(0, totalRows - metrics.rows());
         if (maxScroll <= 0) return null;
         int trackHeight = scrollbar.height();
         int thumb = Math.max(12, trackHeight * metrics.rows() / totalRows);
-        int y = scrollbar.y() + (trackHeight - thumb) * clampScroll(scrollRow, maxScroll) / maxScroll;
+        int clamped = Math.max(0, Math.min(scrollRow, maxScroll));
+        int y = scrollbar.y() + (trackHeight - thumb) * clamped / maxScroll;
         return new Rect(scrollbar.x(), y, scrollbar.width(), thumb);
     }
 

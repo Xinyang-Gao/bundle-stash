@@ -3,6 +3,50 @@
 本项目的所有重要变更都记录在此文件。
 All notable changes to this project are documented in this file.
 
+## [1.0.0] - 2026-10-02
+
+### English
+
+**Fixed**
+
+- The scrollbar thumb never moved while scrolling. `scrollbarThumb` clamped the current row
+  against the maximum scroll amount instead of the total row count, so whenever the list fit
+  within two screens (the common case) the upper bound collapsed to zero and the thumb stayed
+  pinned to the top of the track. The content rows were scrolling all along; only the thumb
+  was stuck. The thumb now maps `scrollRow / maxScroll` onto the track.
+
+**Added**
+
+- Witty empty-state hints in the grid, chosen by why it is empty:
+  - bundles present but every bundle is empty: "Your bundles are 100% air" /
+    "收纳袋里装的都是空气"
+  - bundles have contents but the selected category (or search query) matches nothing:
+    "The bundles checked. Twice." / "袋子们翻了个遍，啥也没找着"
+  - no bundles at all keeps the existing "No bundle in inventory" / "背包里没有收纳袋"
+- A code-generated mod icon (`assets/bundle-stash/icon.png`, referenced through the `icon`
+  field in `fabric.mod.json`): vanilla textures composed by `.tools/icon/IconGen.java` —
+  a 3x3 grid of `container/slot` holding item icons, an enlarged bundle at the center with a
+  drop shadow, the container-style frame/bevel and the sidebar accent bar.
+
+### 中文
+
+**修复**
+
+- 滚动时滚动条滑块纹丝不动。`scrollbarThumb` 把"当前滚动行"夹在了"最大滚动量"而不是
+  "总行数"上，只要列表不超过两屏（最常见情况）上界就恒为 0，滑块永远停在轨道顶端。
+  内容其实一直在滚，卡住的只有滑块。现在按 `scrollRow / maxScroll` 正确映射到轨道位置。
+
+**新增**
+
+- 网格空态的风趣提示，按"为什么空"分别取文案：
+  - 有收纳袋但全是空的：「收纳袋里装的都是空气」 / "Your bundles are 100% air"
+  - 有内容但当前分类或搜索没命中：「袋子们翻了个遍，啥也没找着」 /
+    "The bundles checked. Twice."
+  - 背包里没有收纳袋：沿用原文案
+- 代码生成的模组图标（`assets/bundle-stash/icon.png`，由 `fabric.mod.json` 的 `icon`
+  字段引用）：`.tools/icon/IconGen.java` 用原版贴图合成——3×3 的 `container/slot` 网格
+  加物品图标、正中放大的收纳袋（带投影）、原版容器描边与内斜面，以及侧栏强调色横条。
+
 ## [0.2.1-beta] - 2026-10-02
 
 ### English

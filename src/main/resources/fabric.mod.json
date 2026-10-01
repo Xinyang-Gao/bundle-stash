@@ -18,6 +18,7 @@
   },
   "license": "MIT",
   "environment": "client",
+  "icon": "assets/bundle-stash/icon.png",
   "entrypoints": {
     "client": [
       "bundlestash.BetterBundleMod"
