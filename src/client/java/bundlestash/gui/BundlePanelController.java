@@ -172,6 +172,10 @@ public final class BundlePanelController {
             searchField.render(graphics, mouseX, mouseY, partialTick);
         }
 
+        // 把鼠标上正在拖动的物品画在面板之上，否则面板背景会把它挡住，
+        // 导致往面板里放/从面板里取时看不清具体是什么
+        drawCarriedOnTop(graphics, mouseX, mouseY);
+
         state.setHoveredIndex(hovered);
         hoveredBundleSlot = hovered >= 0 && hovered < view.size()
                 ? model.groups().get(view.get(hovered).groupIndex()).containerSlot()
@@ -185,6 +189,22 @@ public final class BundlePanelController {
 
     private static int rowsOf(int items, int columns) {
         return Math.max(1, (items + columns - 1) / columns);
+    }
+
+    /**
+     * 把玩家手上正在拖动的物品画在面板之上。原版虽然也会画这个"浮动物品"，
+     * 但它可能在面板之前被绘制而被面板背景盖住，这里在面板之后补画一次保证可见。
+     */
+    private void drawCarriedOnTop(GuiGraphicsExtractor graphics, int mouseX, int mouseY) {
+        Minecraft client = Minecraft.getInstance();
+        if (client.player == null) return;
+        ItemStack carried = client.player.containerMenu.getCarried();
+        if (carried.isEmpty()) return;
+        if (layout == null || !layout.panel().contains(mouseX, mouseY)) return;
+        int x = mouseX - 8;
+        int y = mouseY - 8;
+        graphics.item(carried, x, y);
+        graphics.itemDecorations(client.font, carried, x, y);
     }
 
     // ------------------------------------------------------------ 输入

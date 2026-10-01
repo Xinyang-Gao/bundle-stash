@@ -202,8 +202,10 @@ public final class BundlePanelRenderer<S> {
         List<BundleEntry<S>> view = request.view();
         int columns = layout.metrics().columns();
         int totalRows = Math.max(1, (view.size() + columns - 1) / columns);
+        int maxScroll = Math.max(0, totalRows - layout.metrics().rows());
 
         PanelGraphics<S> graphics = request.graphics();
+        if (maxScroll <= 0) return;
         graphics.sprite(SPRITE_SCROLL_TRACK, layout.scrollbar());
         Rect thumb = layout.scrollbarThumb(request.state().scrollRow(), totalRows);
         if (thumb != null) graphics.sprite(SPRITE_SCROLL_THUMB, thumb);
