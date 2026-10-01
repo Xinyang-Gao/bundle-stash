@@ -13,10 +13,10 @@ import java.util.Set;
 public enum ItemCategory {
     ALL("all", "minecraft:compass"),
     BLOCKS("blocks", "minecraft:grass_block"),
-    PARTIAL_BLOCKS("partial_blocks", "minecraft:spruce_door"),
-    PLANTS("plants", "minecraft:cherry_sapling"),
+    PARTIAL_BLOCKS("partial_blocks", "minecraft:oak_slab"),
+    PLANTS("plants", "minecraft:poppy"),
     FOOD("food", "minecraft:bread"),
-    TOOLS("tools", "minecraft:diamond_chestplate"),
+    TOOLS("tools", "minecraft:diamond_pickaxe"),
     MINERALS("minerals", "minecraft:diamond"),
     MISC("misc", "minecraft:leather");
 

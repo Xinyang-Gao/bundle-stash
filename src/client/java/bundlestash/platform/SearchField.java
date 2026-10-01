@@ -50,8 +50,9 @@ public final class SearchField {
         box.setMaxLength(MAX_LENGTH);
         box.setBordered(false);
         box.setCanLoseFocus(true);
-        box.setTextColor(0xFFFFFF);
-        box.setTextColorUneditable(0x888888);
+        // EditBox 的文字颜色是 ARGB，必须带不透明 alpha，否则 alpha=0 会让文字完全看不见
+        box.setTextColor(0xFFFFFFFF);
+        box.setTextColorUneditable(0xFF888888);
         box.setResponder(responder);
         box.setValue(value);
         box.setVisible(visible);

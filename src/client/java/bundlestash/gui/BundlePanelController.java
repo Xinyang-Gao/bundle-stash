@@ -137,7 +137,9 @@ public final class BundlePanelController {
                        GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
         long now = System.currentTimeMillis();
         if (now - lastModelUpdateMs >= MODEL_REFRESH_MS) {
-            this.model = McAccess.collectBundles(false);
+            // 包含空收纳袋：bundleCount() 才能如实反映"背包里有没有收纳袋"，
+            // 空收纳袋没有条目，不会出现在视图里，因此不影响展示
+            this.model = McAccess.collectBundles(true);
             this.lastModelUpdateMs = now;
             this.viewDirty = true;
         }
@@ -246,7 +248,12 @@ public final class BundlePanelController {
 
         searchField.unfocus();
 
-        if (carriedIsNotEmpty()) return BundleActions.depositCarried(McAccess.collectBundles(true));
+        if (carriedIsNotEmpty()) {
+            // 面板内点击一律吞掉事件，避免 vanilla 把鼠标上的物品丢到地上。
+            // 没有可用收纳袋时 depositCarried 是空操作，物品会留在鼠标上。
+            BundleActions.depositCarried(McAccess.collectBundles(true));
+            return true;
+        }
 
         int pressed = layout.cellIndexAt(mouseX, mouseY, state.scrollRow());
         if (pressed < 0 || pressed >= view.size()) return true;

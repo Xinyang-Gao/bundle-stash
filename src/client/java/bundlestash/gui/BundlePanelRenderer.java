@@ -51,6 +51,13 @@ public final class BundlePanelRenderer<S> {
     /** 原版槽位贴图的原始边长，缩放时以它为中心对齐。 */
     private static final int SLOT_NATIVE = 18;
 
+    /**
+     * {@code slot_highlight_*} 是 24×24 的九宫格贴图，自带 4px 透明边（mcmeta border=4）。
+     * 按目标矩形直接绘制时透明边会占掉一圈，只剩中心一小块可见，看起来就是"高亮没盖住整格"；
+     * 绘制时向外扩 4px 即可抵消透明边，让可见高亮铺满整格。
+     */
+    private static final int HIGHLIGHT_PADDING = 4;
+
     private final ItemCategory[] categories;
 
     public BundlePanelRenderer(ItemCategory[] categories) {
@@ -112,12 +119,25 @@ public final class BundlePanelRenderer<S> {
             if (selected) highlightSlot(graphics, cell);
         }
 
-        drawFooter(request, hovered);
+        if (request.model().bundleCount() == 0) {
+            drawEmptyHint(request);
+        } else {
+            drawFooter(request, hovered);
+        }
 
         if (hovered >= 0) {
             graphics.showTooltip(view.get(hovered).stack(), (int) mouseX, (int) mouseY);
         }
         return hovered;
+    }
+
+    /** 背包里一个收纳袋都没有时，在网格区域居中给一句提示。 */
+    private void drawEmptyHint(Request<S> request) {
+        Rect grid = request.layout().grid();
+        PanelGraphics<S> graphics = request.graphics();
+        String hint = graphics.translate("bundlestash.no_bundle");
+        graphics.centeredText(hint, grid.x() + grid.width() / 2,
+                grid.y() + grid.height() / 2 - 4, COLOR_TEXT_DIM);
     }
 
     /** 界面角落的开关按钮：面板隐藏时也显示，方便随时呼出。 */
@@ -151,8 +171,11 @@ public final class BundlePanelRenderer<S> {
     }
 
     private void highlightSlot(PanelGraphics<S> graphics, Rect rect) {
-        graphics.sprite(SPRITE_SLOT_HOVER_BACK, rect);
-        graphics.sprite(SPRITE_SLOT_HOVER_FRONT, rect);
+        // 外扩 HIGHLIGHT_PADDING 抵消九宫格贴图自带的透明边，可见高亮正好铺满 rect
+        Rect target = new Rect(rect.x() - HIGHLIGHT_PADDING, rect.y() - HIGHLIGHT_PADDING,
+                rect.width() + HIGHLIGHT_PADDING * 2, rect.height() + HIGHLIGHT_PADDING * 2);
+        graphics.sprite(SPRITE_SLOT_HOVER_BACK, target);
+        graphics.sprite(SPRITE_SLOT_HOVER_FRONT, target);
     }
 
     // ------------------------------------------------------------ 各区域
