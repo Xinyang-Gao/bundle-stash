@@ -1,0 +1,13 @@
+{
+  "bundlestash.search": "Search...",
+  "bundlestash.category.all": "All",
+  "bundlestash.category.blocks": "Blocks",
+  "bundlestash.category.partial_blocks": "Partial blocks",
+  "bundlestash.category.plants": "Plants",
+  "bundlestash.category.food": "Food",
+  "bundlestash.category.tools": "Tools & equipment",
+  "bundlestash.category.minerals": "Minerals",
+  "bundlestash.category.misc": "Misc",
+  "modmenu.name.bundle-stash": "Bundle Stash",
+  "modmenu.description.bundle-stash": "Shows the contents of all your bundles in a sidebar on container screens, with categories, search, and one-click deposit/withdraw."
+}

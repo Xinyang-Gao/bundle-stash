@@ -1,0 +1,13 @@
+{
+  "bundlestash.search": "搜索…",
+  "bundlestash.category.all": "全部",
+  "bundlestash.category.blocks": "方块",
+  "bundlestash.category.partial_blocks": "不完整方块",
+  "bundlestash.category.plants": "植物",
+  "bundlestash.category.food": "食物",
+  "bundlestash.category.tools": "工具与装备",
+  "bundlestash.category.minerals": "矿物",
+  "bundlestash.category.misc": "杂物",
+  "modmenu.name.bundle-stash": "探囊取物",
+  "modmenu.description.bundle-stash": "在容器界面侧边显示所有收纳袋的内容，支持分类、搜索与一键存取。"
+}

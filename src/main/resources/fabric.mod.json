@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "id": "bundle-stash",
+  "version": "${version}",
+  "name": "Bundle Stash",
+  "description": "Shows the contents of all your bundles in a sidebar on container screens, with categories, search, and one-click deposit/withdraw.",
+  "authors": [
+    "Me!",
+    {
+      "name": "GaoXinyang",
+      "contact": {
+        "homepage": "https://xinyang-gao.github.io",
+        "sources": "https://github.com/xinyang-gao/bundle-stash"
+      }
+    }
+  ],
+  "contact": {
+    "sources": "https://github.com/xinyang-gao/bundle-stash"
+  },
+  "license": "MIT",
+  "environment": "client",
+  "entrypoints": {
+    "client": [
+      "bundlestash.BetterBundleMod"
+    ]
+  },
+  "mixins": [
+    {
+      "config": "bundle-stash.client.mixins.json",
+      "environment": "client"
+    }
+  ],
+  "depends": {
+    "fabricloader": ">=0.19.5",
+    "minecraft": ">=26.3",
+    "java": ">=25"
+  }
+}

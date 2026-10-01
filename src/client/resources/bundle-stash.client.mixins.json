@@ -1,0 +1,16 @@
+{
+  "required": true,
+  "package": "bundlestash.mixin",
+  "compatibilityLevel": "JAVA_25",
+  "minVersion": "0.8",
+  "client": [
+    "AbstractContainerScreenMixin",
+    "AbstractRecipeBookScreenMixin",
+    "accessor.AbstractContainerScreenAccess",
+    "accessor.AbstractRecipeBookScreenAccess",
+    "KeyboardHandlerMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}
