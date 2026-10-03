@@ -1,0 +1,198 @@
+# 基于 Fabric Wiki 教程 + mc-publish 官方文档（当前稳定版 v3.3.1）：
+#   https://wiki.fabricmc.net/tutorial:publishing_mods_using_github_actions
+#   https://github.com/Kira-NT/mc-publish
+#
+# 触发：推送 v* 标签（如 v1.0.2）后自动构建全部 6 个节点并发布。
+#
+# 发布结构：
+#   1. GitHub Release 一条，挂上全部 6 个 jar；
+#   2. Modrinth + CurseForge 按「Minecraft 版本 × 加载器」各发一条版本
+#      （每条只含对应的一个 jar——与 cloth-config、Ad Astra 等多加载器
+#      项目在 Modrinth 上的惯例一致，避免启动器按加载器自动下载时拿错 jar）。
+#
+# 需要的仓库 Secrets（Settings > Secrets and variables > Actions）：
+#   MODRINTH_TOKEN   —— modrinth.com/settings > Authorization token
+#   CURSEFORGE_TOKEN —— curseforge.com/settings > My API Tokens
+#   GITHUB_TOKEN     —— 自动提供，无需配置
+
+name: Publish on GitHub, CurseForge & Modrinth
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      # 版本号只在 gradle.properties 的 mod_version 维护；
+      # 标签必须是 v<mod_version>，防止忘了改版本号就打标签
+      - name: Read mod version and verify tag
+        run: |
+          VERSION="$(sed -n 's/^mod_version=//p' gradle.properties | tr -d '[:space:]')"
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          if [ -z "$VERSION" ]; then
+            echo "::error::mod_version not found in gradle.properties"
+            exit 1
+          fi
+          if [ "$VERSION" != "$TAG_VERSION" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match mod_version=$VERSION"
+            exit 1
+          fi
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Make Gradle Wrapper Executable
+        run: chmod +x ./gradlew
+
+      # 不限定任务路径：根目录聚合调用，构建全部 6 个节点
+      # （26.1/26.2/26.3 × fabric/neoforge），产物收集到
+      # build/libs/<mod_version>+<mc>/bundle-stash-<loader>-<版本>.jar
+      - name: Build
+        run: ./gradlew buildAndCollect
+
+      # CHANGELOG.md 是全历史双语文件，只抽取当前版本章节作为发布说明；
+      # 没找到对应章节时回退为整个文件
+      - name: Extract changelog section
+        run: |
+          awk -v ver="[$VERSION]" '
+            /^## \[/ {
+              if (found) exit
+              if (index($0, ver)) found = 1
+            }
+            found { print }
+          ' CHANGELOG.md > release-notes.md
+          if [ ! -s release-notes.md ]; then
+            echo "::warning::No changelog section for $VERSION, using full CHANGELOG.md"
+            cp CHANGELOG.md release-notes.md
+          fi
+
+      # ---------- GitHub Release：一条，挂全部 6 个 jar ----------
+      - name: Publish to GitHub Releases
+        uses: Kira-NT/mc-publish@v3.3.1
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          github-tag: v${{ env.VERSION }}
+          files: 'build/libs/${{ env.VERSION }}+*/!(*-@(sources|javadoc)).jar'
+          name: Bundle Stash ${{ env.VERSION }} for Minecraft 26.1-26.3
+          version: ${{ env.VERSION }}
+          changelog-file: release-notes.md
+
+      # ---------- Modrinth + CurseForge：按 MC 版本 × 加载器各发一条 ----------
+      # github-token 显式置空 = 不发布到 GitHub（避免重复操作 Release）
+      - name: Publish 26.1 Fabric
+        uses: Kira-NT/mc-publish@v3.3.1
+        with:
+          modrinth-id: zwTMqGBE
+          modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
+          curseforge-id: 1721400
+          curseforge-token: ${{ secrets.CURSEFORGE_TOKEN }}
+          github-token: ''
+          files: 'build/libs/${{ env.VERSION }}+26.1/bundle-stash-fabric-${{ env.VERSION }}+26.1.jar'
+          name: Bundle Stash ${{ env.VERSION }} for Minecraft 26.1 (Fabric)
+          version: ${{ env.VERSION }}+26.1-fabric
+          changelog-file: release-notes.md
+          loaders: fabric
+          game-versions: '26.1'
+          environment: client
+          java: '25'
+
+      - name: Publish 26.1 NeoForge
+        uses: Kira-NT/mc-publish@v3.3.1
+        with:
+          modrinth-id: zwTMqGBE
+          modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
+          curseforge-id: 1721400
+          curseforge-token: ${{ secrets.CURSEFORGE_TOKEN }}
+          github-token: ''
+          files: 'build/libs/${{ env.VERSION }}+26.1/bundle-stash-neoforge-${{ env.VERSION }}+26.1.jar'
+          name: Bundle Stash ${{ env.VERSION }} for Minecraft 26.1 (NeoForge)
+          version: ${{ env.VERSION }}+26.1-neoforge
+          changelog-file: release-notes.md
+          loaders: neoforge
+          game-versions: '26.1'
+          environment: client
+          java: '25'
+
+      - name: Publish 26.2 Fabric
+        uses: Kira-NT/mc-publish@v3.3.1
+        with:
+          modrinth-id: zwTMqGBE
+          modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
+          curseforge-id: 1721400
+          curseforge-token: ${{ secrets.CURSEFORGE_TOKEN }}
+          github-token: ''
+          files: 'build/libs/${{ env.VERSION }}+26.2/bundle-stash-fabric-${{ env.VERSION }}+26.2.jar'
+          name: Bundle Stash ${{ env.VERSION }} for Minecraft 26.2 (Fabric)
+          version: ${{ env.VERSION }}+26.2-fabric
+          changelog-file: release-notes.md
+          loaders: fabric
+          game-versions: '26.2'
+          environment: client
+          java: '25'
+
+      - name: Publish 26.2 NeoForge
+        uses: Kira-NT/mc-publish@v3.3.1
+        with:
+          modrinth-id: zwTMqGBE
+          modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
+          curseforge-id: 1721400
+          curseforge-token: ${{ secrets.CURSEFORGE_TOKEN }}
+          github-token: ''
+          files: 'build/libs/${{ env.VERSION }}+26.2/bundle-stash-neoforge-${{ env.VERSION }}+26.2.jar'
+          name: Bundle Stash ${{ env.VERSION }} for Minecraft 26.2 (NeoForge)
+          version: ${{ env.VERSION }}+26.2-neoforge
+          changelog-file: release-notes.md
+          loaders: neoforge
+          game-versions: '26.2'
+          environment: client
+          java: '25'
+
+      - name: Publish 26.3 Fabric
+        uses: Kira-NT/mc-publish@v3.3.1
+        with:
+          modrinth-id: zwTMqGBE
+          modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
+          curseforge-id: 1721400
+          curseforge-token: ${{ secrets.CURSEFORGE_TOKEN }}
+          github-token: ''
+          files: 'build/libs/${{ env.VERSION }}+26.3/bundle-stash-fabric-${{ env.VERSION }}+26.3.jar'
+          name: Bundle Stash ${{ env.VERSION }} for Minecraft 26.3 (Fabric)
+          version: ${{ env.VERSION }}+26.3-fabric
+          changelog-file: release-notes.md
+          loaders: fabric
+          game-versions: '26.3'
+          environment: client
+          java: '25'
+
+      - name: Publish 26.3 NeoForge
+        uses: Kira-NT/mc-publish@v3.3.1
+        with:
+          modrinth-id: zwTMqGBE
+          modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
+          curseforge-id: 1721400
+          curseforge-token: ${{ secrets.CURSEFORGE_TOKEN }}
+          github-token: ''
+          files: 'build/libs/${{ env.VERSION }}+26.3/bundle-stash-neoforge-${{ env.VERSION }}+26.3.jar'
+          name: Bundle Stash ${{ env.VERSION }} for Minecraft 26.3 (NeoForge)
+          version: ${{ env.VERSION }}+26.3-neoforge
+          changelog-file: release-notes.md
+          loaders: neoforge
+          game-versions: '26.3'
+          environment: client
+          java: '25'
