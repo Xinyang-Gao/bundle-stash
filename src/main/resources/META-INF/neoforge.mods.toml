@@ -1,0 +1,36 @@
+# NeoForge 模组元数据（由 processResources 按节点展开 version / minecraft / neo_version）。
+# 注意：NeoForge 的 modId 不允许连字符，因此这里使用 bundle_stash；
+# Fabric 侧仍为 bundle-stash。资源命名空间 assets/bundle-stash 两侧通用。
+
+modLoader = "javafml"
+loaderVersion = "[1,)"
+license = "MIT"
+
+[[mods]]
+modId = "bundle_stash"
+version = "${version}"
+displayName = "Bundle Stash"
+logoFile = "assets/bundle-stash/icon.png"
+authors = "GaoXinyang"
+displayURL = "https://github.com/xinyang-gao/bundle-stash"
+description = '''
+Shows the contents of all your bundles in a sidebar on container screens, with categories, search, and one-click deposit/withdraw.
+'''
+
+# 客户端 Mixin 配置（与 Fabric 共用同一份 json，client 数组只在客户端应用）
+[[mixins]]
+config = "bundle-stash.client.mixins.json"
+
+[[dependencies.bundle_stash]]
+    modId = "neoforge"
+    type = "required"
+    versionRange = "[${neo_version},)"
+    ordering = "NONE"
+    side = "BOTH"
+
+[[dependencies.bundle_stash]]
+    modId = "minecraft"
+    type = "required"
+    versionRange = "${minecraft}"
+    ordering = "NONE"
+    side = "BOTH"

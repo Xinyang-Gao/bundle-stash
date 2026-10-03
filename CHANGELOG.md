@@ -3,6 +3,54 @@
 本项目的所有重要变更都记录在此文件。
 All notable changes to this project are documented in this file.
 
+## [1.0.1] - 2026-10-03
+
+### English
+
+**Added**
+
+- Multi-version × multi-loader matrix: Minecraft 26.1 / 26.2 / 26.3 × Fabric / NeoForge
+  (six nodes), driven by Stonecutter + Architectury Loom's `loom-no-remap` variant
+  (26.x is unobfuscated, so no mappings or remapping are involved). Switch the edited
+  node with `./gradlew "Set active project to <node>"`; `./gradlew build` builds the
+  whole matrix and `./gradlew buildAndCollect` additionally collects jars into
+  `build/libs/<mod version>+<mc>/`.
+- NeoForge builds (modId `bundle_stash` — NeoForge disallows hyphens) with
+  `META-INF/neoforge.mods.toml` and a client-only `@Mod(dist = CLIENT)` entry; both
+  loaders share `BetterBundleMod.init(...)` and the same mixin config, and each jar
+  only carries its own loader's metadata.
+- Stonecutter version guards for API drift across 26.1–26.3: current-screen lookup
+  (changed in 26.2), space-key down check, mouse-button numbering and the IME preedit
+  callback rename `textEditing` ↔ `preeditCallback` (changed in 26.3), `BundleContents`
+  materialisation / insertion API (changed in 26.3).
+
+**Changed**
+
+- Merged `src/client` into `src/main` — the flat multi-loader layout uses a single
+  source set; client-only behaviour remains enforced by `environment`/`@Mod` metadata
+  and the mixin config's `client` array.
+
+### 中文
+
+**新增**
+
+- 多版本 × 多加载器矩阵：Minecraft 26.1 / 26.2 / 26.3 × Fabric / NeoForge（6 个节点），
+  由 Stonecutter + Architectury Loom 的 `loom-no-remap` 变体驱动（26.x 不混淆，不涉及
+  映射与重映射）。用 `./gradlew "Set active project to <节点>"` 切换编辑节点；
+  `./gradlew build` 构建整个矩阵，`./gradlew buildAndCollect` 额外把 jar 汇总到
+  `build/libs/<模组版本>+<mc>/`。
+- NeoForge 构建（modId 为 `bundle_stash`——该加载器不允许连字符），元数据
+  `META-INF/neoforge.mods.toml`，入口是仅客户端的 `@Mod(dist = CLIENT)`；两个加载器
+  共用 `BetterBundleMod.init(...)` 与同一份 mixin 配置，每个 jar 只带自己加载器的元数据。
+- 用 Stonecutter 版本分支处理 26.1–26.3 的 API 漂移：取当前屏幕（26.2 起变化）、
+  空格键检测、鼠标键编号与输入法预编辑回调改名 `textEditing` ↔ `preeditCallback`
+  （26.3 起变化）、`BundleContents` 的物化 / 插入 API（26.3 起变化）。
+
+**变更**
+
+- `src/client` 并入 `src/main`——扁平多加载器布局使用单一源集；仅客户端行为仍由
+  `environment`/`@Mod` 元数据与 mixin 配置的 `client` 数组保证。
+
 ## [1.0.0] - 2026-10-02
 
 ### English

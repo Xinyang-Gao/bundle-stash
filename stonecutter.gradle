@@ -1,0 +1,20 @@
+// Stonecutter 项目控制器 = 根项目的构建脚本。
+plugins {
+    id 'dev.kikugie.stonecutter'
+    // 两个 loom 变体放到根构建类路径，供各节点 build.gradle 按加载器选用：
+    // - 常规 arch-loom（如需）
+    // - loom-no-remap：26.x（不混淆、无需重映射）的 Fabric/NeoForge 支持
+    id 'dev.architectury.loom' apply false
+    id 'dev.architectury.loom-no-remap' apply false
+}
+
+// 设置当前活跃节点（决定根目录 src/ 的预处理状态；可由 stonecutterSwitchTo... 任务切换）。
+// 切换会改写下一行，不要以其他方式编辑。
+stonecutter.active '26.3-fabric'
+
+// 全矩阵收集：./gradlew buildAndCollect —— 构建全部节点并把 jar 汇总到根 build/libs/<版本>/
+tasks.register('buildAndCollect') {
+    group = 'build'
+    description = 'Builds every node and collects jars into root build/libs/<version>/'
+    dependsOn stonecutter.tasks.named('buildAndCollect')
+}

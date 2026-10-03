@@ -1,11 +1,58 @@
 pluginManagement {
     repositories {
+        gradlePluginPortal()
+        mavenCentral()
         maven {
             name = 'Fabric'
             url = 'https://maven.fabricmc.net/'
         }
-        mavenCentral()
-        gradlePluginPortal()
+        maven {
+            name = 'Architectury'
+            url = 'https://maven.architectury.dev/'
+        }
+        maven {
+            // architectury-loom 自身的构建依赖（mcinjector、DiffPatch 等）
+            name = 'MinecraftForge'
+            url = 'https://maven.minecraftforge.net/'
+        }
+        // 下面两个是 NeoForge 内容源；maven.neoforged.net 直连在部分网络下会被重置，镜像放前面
+        maven {
+            name = 'BMCLAPI'
+            url = 'https://bmclapi2.bangbang93.com/maven'
+        }
+        maven {
+            name = 'NeoForged'
+            url = 'https://maven.neoforged.net/releases/'
+        }
+    }
+    plugins {
+        // 插件版本在 settings 中统一声明；build.gradle 按节点用 apply plugin 选用变体
+        id 'dev.architectury.loom' version '1.17.493'
+        id 'dev.architectury.loom-no-remap' version '1.17.493'
+    }
+}
+
+plugins {
+    id 'dev.kikugie.stonecutter' version '0.9.8'
+}
+
+stonecutter {
+    // 使用 Groovy DSL（本仓库的构建脚本都是 .gradle）
+    kotlinController = false
+    centralScript = 'build.gradle'
+
+    // 多版本 × 多加载器：项目名 <mc>-<loader>，预处理用的逻辑版本只取 <mc>
+    create(getRootProject()) {
+        // Reset active project 时回到的规范节点（与 stonecutter.active 保持一致）
+        vcsVersion = '26.3-fabric'
+        versions([
+                '26.1-fabric'  : '26.1',
+                '26.1-neoforge': '26.1',
+                '26.2-fabric'  : '26.2',
+                '26.2-neoforge': '26.2',
+                '26.3-fabric'  : '26.3',
+                '26.3-neoforge': '26.3',
+        ])
     }
 }
 

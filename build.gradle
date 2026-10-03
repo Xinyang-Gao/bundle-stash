@@ -1,17 +1,53 @@
 plugins {
-    id 'net.fabricmc.fabric-loom' version "${loom_version}"
     id 'maven-publish'
 }
 
-version = project.mod_version
-group = project.maven_group
+// 根项目只是版本树的宿主；若 central script 也会在根上求值，这里直接跳过全部 loom 配置
+if (project == rootProject) {
+    return
+}
+
+// ============ 当前节点上下文 ============
+def mcVersion = sc.current.version                                             // 26.1 / 26.2 / 26.3
+def loader = sc.current.project.substring(sc.current.project.lastIndexOf('-') + 1) // fabric / neoforge
+def isFabric = loader == 'fabric'
+
+// Minecraft 兼容区间，如 [26.1,26.2)
+def mcParts = mcVersion.tokenize('.')
+def mcRange = "[${mcVersion},${mcParts[0]}.${mcParts[1].toInteger() + 1})"
+
+// 26.x 起 Minecraft 不再混淆：统一使用 Architectury Loom 的 no-remap 变体，
+// 无需映射表、无需重映射（loom.platform 由各节点 gradle.properties 指定）
+apply plugin: 'dev.architectury.loom-no-remap'
+
+version = "${property('mod_version')}+${mcVersion}"
+group = property('maven_group')
+base.archivesName = "bundle-stash-${loader}"
+
+// 源码分支开关：//? if fabric { ... } //? elif neoforge { ... }
+stonecutter {
+    constants.match(loader, 'fabric', 'neoforge')
+}
 
 repositories {
+    mavenCentral()
     maven {
         name = 'Fabric'
         url = 'https://maven.fabricmc.net/'
     }
-    mavenCentral()
+    maven {
+        name = 'Architectury'
+        url = 'https://maven.architectury.dev/'
+    }
+    // maven.neoforged.net 直连在部分网络下会被重置，先走镜像，缺失时回退官方源
+    maven {
+        name = 'BMCLAPI'
+        url = 'https://bmclapi2.bangbang93.com/maven'
+    }
+    maven {
+        name = 'NeoForged'
+        url = 'https://maven.neoforged.net/releases/'
+    }
 }
 
 configurations {
@@ -21,25 +57,53 @@ configurations {
 }
 
 loom {
-    splitEnvironmentSourceSets()
+    // 不混淆的 26.x 没有 intermediary，禁用中间映射
+    noIntermediateMappings()
 }
 
 dependencies {
-    minecraft "com.mojang:minecraft:${project.minecraft_version}"
+    minecraft "com.mojang:minecraft:${mcVersion}"
 
-    implementation "net.fabricmc:fabric-loader:${project.loader_version}"
-    // 本模组不使用 Fabric API，因此不引入它，避免被某个版本的 API 卡住
+    if (isFabric) {
+        // no-remap 变体没有 mod* 重映射配置，直接用 implementation
+        implementation "net.fabricmc:fabric-loader:${property('deps.fabric_loader')}"
+        // 本模组不使用 Fabric API，因此不引入它，避免被某个版本的 API 卡住
+    } else {
+        neoForge "net.neoforged:neoforge:${property('deps.neoforge')}"
+    }
 
-    embed "com.belerweb:pinyin4j:${project.pinyin4j_version}"
+    embed "com.belerweb:pinyin4j:${property('pinyin4j_version')}"
 }
 
 processResources {
-    def version = project.version
-    inputs.property "version", version
+    def expandProps = [
+        version    : version.toString(),
+        // fabric.mod.json 用 Fabric 的谓词语法（~ 同大版本，官方模板同款写法）
+        mc_compat  : "~${mcVersion}",
+        // mods.toml 用 Maven 版本区间
+        minecraft  : mcRange,
+        neo_version: (findProperty('deps.neoforge') ?: '').toString(),
+    ]
+    inputs.properties expandProps
 
-    filesMatching("fabric.mod.json") {
-        expand "version": version
+    filesMatching('fabric.mod.json') {
+        expand expandProps
     }
+    filesMatching('META-INF/neoforge.mods.toml') {
+        expand expandProps
+    }
+
+    // 每个 jar 只带自己的加载器元数据
+    if (isFabric) {
+        exclude 'META-INF/neoforge.mods.toml'
+    } else {
+        exclude 'fabric.mod.json'
+    }
+}
+
+// NeoForge 的 userdev 处理要先拿到 Stonecutter 预处理后的源码（Stonecutter 文档要求）
+tasks.matching { it.name == 'createMinecraftArtifacts' }.configureEach {
+    dependsOn 'stonecutterGenerate'
 }
 
 tasks.withType(JavaCompile).configureEach {
@@ -62,9 +126,22 @@ jar {
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 }
 
+// 构建本节点并把产物收集到根 build/libs/<版本>/
+tasks.register('buildAndCollect', Copy) {
+    group = 'build'
+    description = 'Builds this node and collects jars into root build/libs/<version>/'
+    dependsOn 'build'
+    // no-remap 模式没有 remapJar/remapSourcesJar，最终产物就是 jar/sourcesJar
+    def mainJar = tasks.names.contains('remapJar') ? 'remapJar' : 'jar'
+    def srcJar = tasks.names.contains('remapSourcesJar') ? 'remapSourcesJar' : 'sourcesJar'
+    from(tasks.named(mainJar).flatMap { it.archiveFile })
+    from(tasks.named(srcJar).flatMap { it.archiveFile })
+    into(rootProject.layout.buildDirectory.file("libs/${version}"))
+}
+
 publishing {
     publications {
-        create("mavenJava", MavenPublication) {
+        create('mavenJava', MavenPublication) {
             from components.java
         }
     }

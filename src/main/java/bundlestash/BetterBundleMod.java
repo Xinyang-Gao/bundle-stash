@@ -4,8 +4,15 @@ import bundlestash.config.BundleConfig;
 import bundlestash.core.Romanizer;
 import bundlestash.gui.BundlePanelController;
 import bundlestash.platform.PinyinRomanizer;
+//? if fabric {
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.loader.api.FabricLoader;
+//?} elif neoforge {
+/*import net.neoforged.api.distmarker.Dist;
+import net.neoforged.fml.common.Mod;
+import net.neoforged.fml.loading.FMLPaths;
+*///?}
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -17,8 +24,15 @@ import java.util.function.Supplier;
 /**
  * 客户端入口。只负责加载配置并持有侧栏控制器，
  * 具体渲染与交互分别由 {@code gui} 和 {@code mixin} 包承担。
+ * Fabric 侧是 ClientModInitializer 入口，NeoForge 侧是 @Mod（仅客户端加载）入口，
+ * 两者都汇合到 {@link #init(Path)}。
  */
+//? if fabric {
 public final class BetterBundleMod implements ClientModInitializer {
+//?} elif neoforge {
+/*@Mod(value = "bundle_stash", dist = Dist.CLIENT)
+public final class BetterBundleMod {
+*///?}
 
     public static final String MOD_ID = "bundle-stash";
 
@@ -32,10 +46,21 @@ public final class BetterBundleMod implements ClientModInitializer {
     private BundlePanelController controller;
     private Path configPath;
 
+    //? if fabric {
     @Override
     public void onInitializeClient() {
+        init(FabricLoader.getInstance().getConfigDir().resolve("bundle-stash.json"));
+    }
+    //?} elif neoforge {
+    /*public BetterBundleMod() {
+        init(FMLPaths.CONFIGDIR.get().resolve("bundle-stash.json"));
+    }
+    *///?}
+
+    /** 两个加载器共用的初始化逻辑。 */
+    private void init(Path path) {
         instance = this;
-        configPath = FabricLoader.getInstance().getConfigDir().resolve("bundle-stash.json");
+        configPath = path;
         config = BundleConfig.load(configPath);
 
         // 拼音库缺失/未启用时降级为普通搜索

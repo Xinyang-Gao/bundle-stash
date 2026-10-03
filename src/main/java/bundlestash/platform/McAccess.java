@@ -170,8 +170,12 @@ public final class McAccess {
 
     private static BundleGroup<ItemStack> buildGroup(ItemStack bundleStack, BundleContents contents,
                                                      int slotId, int groupIndex) {
-        // 26.3 起袋内物品以 ItemStackTemplate 存储，绘制要的还是实体堆叠，这里照旧物化一份
+        // 被袋内物品在 26.3 起以 ItemStackTemplate 存储，绘制要的还是实体堆叠，这里照旧物化一份
+        //? if >=26.3 {
         List<ItemStack> stacks = contents.itemCopies().toList();
+        //?} else {
+        /*List<ItemStack> stacks = contents.itemCopyStream().toList();
+        *///?}
         List<BundleEntry<ItemStack>> items = new ArrayList<>(stacks.size());
         for (int i = 0; i < stacks.size(); i++) {
             ItemStack stack = stacks.get(i);
@@ -273,7 +277,11 @@ public final class McAccess {
     public static boolean canAccept(ItemStack bundleStack, ItemStack stack) {
         if (bundleStack == null || stack == null || stack.isEmpty()) return false;
         BundleContents contents = contentsOf(bundleStack);
+        //? if >=26.3 {
         return contents.asMutable().tryInsert(stack.copy()) > 0;
+        //?} else {
+        /*return new BundleContents.Mutable(contents).tryInsert(stack.copy()) > 0;
+        *///?}
     }
 
     // ------------------------------------------------------------ 网络交互
@@ -305,14 +313,24 @@ public final class McAccess {
     // ------------------------------------------------------------ 鼠标按键
 
     /**
+     * 鼠标键编号。
+     * <p>
      * 26.3 起鼠标事件改用 SDL 编号：1 = 左键、2 = 中键、3 = 右键——vanilla 自己也是按这套判断的
-     * （见 {@code AbstractContainerScreen#getContainerClickButton}）。
+     * （见 26.3 的 {@code AbstractContainerScreen#getContainerClickButton}）。
+     * 26.1 / 26.2 则沿用 GLFW 编号：0 = 左键、1 = 右键、2 = 中键，
+     * vanilla 把 {@code button()} 原样作为容器点击的键位传下去。
      * <p>
      * 这与"容器点击"的 0 = 主键 / 1 = 副键是两套编号，{@link #sendClick} 用的是后者。
      */
+    //? if >=26.3 {
     public static final int MOUSE_LEFT = 1;
     public static final int MOUSE_MIDDLE = 2;
     public static final int MOUSE_RIGHT = 3;
+    //?} else {
+    /*public static final int MOUSE_LEFT = 0;
+    public static final int MOUSE_MIDDLE = 2;
+    public static final int MOUSE_RIGHT = 1;
+    *///?}
 
     public static boolean isLeftClick(MouseButtonEvent event) {
         return event.button() == MOUSE_LEFT;

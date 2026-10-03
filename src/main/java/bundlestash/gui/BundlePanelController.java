@@ -141,7 +141,11 @@ public final class BundlePanelController {
     }
 
     private boolean isRecipeBookOpen() {
+        //? if >=26.2 {
         Screen screen = Minecraft.getInstance().gui.screen();
+        //?} else {
+        /*Screen screen = Minecraft.getInstance().screen;
+        *///?}
         return screen instanceof AbstractRecipeBookScreenAccess access
                 && access.bundlestash$recipeBookComponent().isVisible();
     }
@@ -315,7 +319,11 @@ public final class BundlePanelController {
         if (pressed < 0 || pressed >= view.size()) return true;
 
         BundleEntry<ItemStack> entry = view.get(pressed);
+        //? if >=26.2 {
         boolean preferContainer = !(Minecraft.getInstance().gui.screen() instanceof InventoryScreen);
+        //?} else {
+        /*boolean preferContainer = !(Minecraft.getInstance().screen instanceof InventoryScreen);
+        *///?}
         if (event.hasShiftDown()) {
             if (!BundleActions.takeToSlot(model, entry, preferContainer)) {
                 BundleActions.takeToCursor(model, entry);

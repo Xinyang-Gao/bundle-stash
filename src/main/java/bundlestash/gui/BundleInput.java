@@ -4,6 +4,7 @@ import bundlestash.BetterBundleMod;
 import bundlestash.core.Rect;
 import bundlestash.mixin.accessor.AbstractContainerScreenAccess;
 import com.mojang.blaze3d.platform.InputConstants;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.world.inventory.Slot;
 
@@ -24,7 +25,11 @@ public final class BundleInput {
                                         boolean doubleClick) {
         BundlePanelController controller = BetterBundleMod.instance().controller();
 
+        //? if >=26.3 {
         if (InputConstants.isKeyDown(InputConstants.KEY_SPACE)) {
+        //?} else {
+        /*if (InputConstants.isKeyDown(Minecraft.getInstance().getWindow(), InputConstants.KEY_SPACE)) {
+        *///?}
             Slot hovered = access.bundlestash$hoveredSlot();
             if (hovered != null && hovered.hasItem() && controller.handleBulkInsert(hovered)) {
                 lastDraggedSlot = hovered.index;
@@ -36,7 +41,11 @@ public final class BundleInput {
     }
 
     public static boolean onMouseDragged(AbstractContainerScreenAccess access, MouseButtonEvent event) {
+        //? if >=26.3 {
         if (!InputConstants.isKeyDown(InputConstants.KEY_SPACE)) return false;
+        //?} else {
+        /*if (!InputConstants.isKeyDown(Minecraft.getInstance().getWindow(), InputConstants.KEY_SPACE)) return false;
+        *///?}
         Slot hovered = access.bundlestash$hoveredSlot();
         if (hovered == null || !hovered.hasItem() || hovered.index == lastDraggedSlot) return false;
 

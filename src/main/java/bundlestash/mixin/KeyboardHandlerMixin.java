@@ -44,7 +44,12 @@ public abstract class KeyboardHandlerMixin {
         if (field != null && field.onCharTyped(event)) ci.cancel();
     }
 
+    // 输入法预编辑回调在 26.3 改名为 textEditing（26.1/26.2 叫 preeditCallback），签名一致
+    //? if >=26.3 {
     @Inject(method = "textEditing", at = @At("HEAD"), cancellable = true)
+    //?} else {
+    /*@Inject(method = "preeditCallback", at = @At("HEAD"), cancellable = true)
+    *///?}
     private void betterBundle$textEditing(long handle, PreeditEvent event, CallbackInfo ci) {
         SearchField field = searchField();
         if (field != null && field.onPreeditUpdated(event)) ci.cancel();
